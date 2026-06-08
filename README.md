@@ -28,7 +28,7 @@ YouTube API       →  Uploads video with title, description, tags, hashtags
 ## 📁 Repository File Structure
 
 ```
-fruits-with-facts/
+autopost/
 │
 ├── .github/
 │   └── workflows/

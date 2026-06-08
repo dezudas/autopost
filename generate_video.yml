@@ -1,4 +1,4 @@
-name: Generate & Upload Fruits Short
+name: Generate & Upload Short
 
 on:
   schedule:

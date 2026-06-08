@@ -48,7 +48,7 @@ Required environment variables:
 - `final_video.mp4` — finished Short
 
 **Fruit tracking:**
-- `list.txt` — ordered list; add new fruits here (one per line)
+- `list.txt` — ordered list; add new post here (one per line)
 - `done.txt` — auto-appended after each successful upload; the bot skips any fruit already in this file
 
 **Voice fallback chain** (step 2): HuggingFace Kokoro-82M → gTTS → espeak-ng
@@ -78,5 +78,5 @@ Required environment variables:
 
 - **`invalid_grant` on YouTube upload** — refresh token expired; repeat the OAuth flow and update the secret
 - **Gradient images instead of fruit photos** — Pollinations timed out; re-run the workflow
-- **All fruits completed** — add more lines to `list.txt`
+- **All post completed** — add more lines to `list.txt`
 - **`GEMINI_API_KEY not set`** — secret missing or misnamed in GitHub repo settings

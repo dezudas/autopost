@@ -598,7 +598,7 @@ def assemble_video(data, srt_path, music_path):
 
 if __name__ == "__main__":
     data = load_video_data()
-    print(f"=== Assembling: {data['fruit']} ===")
+    print(f"=== Assembling: {data['topic']} ===")
 
     srt_path, _ = create_subtitles(data, thumbnail_offset=1.5)
     # Music must cover the FULL video duration
