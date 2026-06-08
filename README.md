@@ -1,4 +1,4 @@
-# 🍎 Fruits with Facts — Full Automation Setup Guide
+# AutoPost — Full Automation Setup Guide
 
 > **Fully automated faceless YouTube channel. Zero human involvement after setup.**
 > Posts 3 videos/week automatically. 100% free. No watermarks. No credit card.
@@ -41,8 +41,8 @@ fruits-with-facts/
 │   ├── 4_assemble_video.py          ← FFmpeg builds MP4 + subtitles
 │   └── 5_upload_youtube.py          ← Uploads to YouTube
 │
-├── fruits_list.txt                  ← 100 fruits to cover (pre-filled)
-├── fruits_done.txt                  ← Auto-updated after each video
+├── list.txt                  ← 100 fruits to cover (pre-filled)
+├── done.txt                  ← Auto-updated after each video
 └── requirements.txt                 ← Python dependencies
 ```
 
@@ -98,8 +98,8 @@ For each file, click **Add file → Create new file** in your repo:
 | `scripts/4_assemble_video.py` | 4_assemble_video.py |
 | `scripts/5_upload_youtube.py` | 5_upload_youtube.py |
 | `requirements.txt` | requirements.txt |
-| `fruits_list.txt` | fruits_list.txt |
-| `fruits_done.txt` | Leave completely empty |
+| `list.txt` | list.txt |
+| `done.txt` | Leave completely empty |
 
 > ⚠️ For `.github/workflows/generate_video.yml` — type the full path
 > including folders in the filename box. GitHub auto-creates the folders
@@ -282,7 +282,7 @@ Edit `scripts/4_assemble_video.py` — find `subtitle_style`:
 ```
 
 ### Add more fruits
-Simply add new lines to `fruits_list.txt` in GitHub.
+Simply add new lines to `list.txt` in GitHub.
 The bot picks them up automatically on the next run.
 
 ### Change video privacy
@@ -325,7 +325,7 @@ Your refresh token expired. Fix:
 → Re-run the workflow; Pollinations usually works on retry
 
 ### ❌ All fruits completed
-→ Add more fruit names to `fruits_list.txt` (one per line)
+→ Add more fruit names to `list.txt` (one per line)
 
 ---
 

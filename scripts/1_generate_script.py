@@ -11,55 +11,55 @@ import random
 import requests
 
 
-def get_next_fruit():
-    with open("fruits_list.txt", "r") as f:
-        all_fruits = [l.strip() for l in f if l.strip() and not l.startswith("#")]
+def get_next_topic():
+    with open("list.txt", "r") as f:
+        all_topics = [l.strip() for l in f if l.strip() and not l.startswith("#")]
     done = []
-    if os.path.exists("fruits_done.txt"):
-        with open("fruits_done.txt", "r") as f:
+    if os.path.exists("done.txt"):
+        with open("done.txt", "r") as f:
             done = [l.strip() for l in f if l.strip() and not l.startswith("#")]
-    remaining = [f for f in all_fruits if f not in done]
+    remaining = [t for t in all_topics if t not in done]
     if not remaining:
-        print("All fruits completed!")
+        print("All topics completed!")
         sys.exit(0)
-    print(f"Next fruit: {remaining[0]}")
+    print(f"Next topic: {remaining[0]}")
     return remaining[0]
 
 
-def build_prompt(fruit_name):
-    return f"""You are a YouTube Shorts script writer for "Fruits with Facts" channel.
+def build_prompt(topic_name):
+    return f"""You are a YouTube Shorts script writer for "Guitar with Facts" channel.
 
-Create a punchy 60-second script about: {fruit_name}
+Create a punchy 60-second script about: {topic_name}
 
 Return ONLY raw valid JSON, no markdown, no backticks:
 
 {{
-  "fruit": "{fruit_name}",
-  "title": "5 Wild Facts About {fruit_name} #Shorts #FruitFacts",
-  "description": "Write 80-100 words about {fruit_name} facts with hashtags at end",
-  "tags": ["{fruit_name}", "fruit facts", "shorts", "did you know", "healthy food", "nutrition facts", "food facts", "fruits with facts", "5 facts", "educational shorts"],
+  "topic": "{topic_name}",
+  "title": "5 Wild Facts About {topic_name} #Shorts #GuitarFacts",
+  "description": "Write 80-100 words about {topic_name} facts with hashtags at end",
+  "tags": ["{topic_name}", "guitar facts", "shorts", "did you know", "guitar chords", "music theory", "guitar tips", "guitar with facts", "5 facts", "educational shorts"],
   "voiceover": {{
-    "hook": "One punchy hook sentence about {fruit_name} max 12 words",
-    "fact_1": "One surprising fact about {fruit_name} max 20 words",
-    "fact_2": "One health benefit of {fruit_name} max 20 words",
-    "fact_3": "One history fact about {fruit_name} max 20 words",
-    "fact_4": "One weird fact about {fruit_name} max 20 words",
-    "fact_5": "One record or unique use of {fruit_name} max 20 words",
-    "outro": "Follow for more fruity facts! Like and subscribe to Fruits with Facts!"
+    "hook": "One punchy hook sentence about {topic_name} max 12 words",
+    "fact_1": "One surprising fact about {topic_name} max 20 words",
+    "fact_2": "One technique or playing tip about {topic_name} max 20 words",
+    "fact_3": "One history or origin fact about {topic_name} max 20 words",
+    "fact_4": "One famous player or song using {topic_name} max 20 words",
+    "fact_5": "One record or unique use of {topic_name} max 20 words",
+    "outro": "Follow for more guitar facts! Like and subscribe to Guitar with Facts!"
   }},
   "image_prompts": [
-    "Professional photo of fresh {fruit_name} on white background",
-    "{fruit_name} cut open showing inside macro photography",
-    "{fruit_name} growing naturally on tree or plant",
-    "{fruit_name} with water droplets dark background",
-    "{fruit_name} in wooden bowl warm rustic lighting"
+    "Professional photo of guitarist demonstrating {topic_name} on white background",
+    "Close-up macro of guitar fretboard showing {topic_name} hand position",
+    "Acoustic guitar with {topic_name} chord shape, warm studio lighting",
+    "Electric guitar neck showing {topic_name} with dark dramatic background",
+    "Guitarist playing {topic_name} on stage with concert lighting"
   ],
   "colors": {{
-    "primary": "vibrant hex color matching {fruit_name}",
+    "primary": "vibrant hex color matching guitar or music theme",
     "secondary": "complementary darker hex color",
     "accent": "bright accent hex color"
   }},
-  "emoji": "best emoji for {fruit_name}"
+  "emoji": "best emoji for {topic_name}"
 }}
 
 Write REAL facts only. All fields must have actual content."""
@@ -70,7 +70,6 @@ def call_gemini(prompt, api_key):
     Try lightest models first (less demand), heavy models last.
     Smart backoff: 5s, 15s, 30s between retries.
     """
-    # Lightest to heaviest — less popular = less overloaded
     models = [
         "gemini-2.0-flash-lite",
         "gemini-2.5-flash-lite",
@@ -110,17 +109,14 @@ def call_gemini(prompt, api_key):
                 err = r.text.lower()
                 print(f"HTTP {r.status_code}")
 
-                # Auth error - fail immediately
                 if r.status_code == 401:
                     raise Exception("Invalid GEMINI_API_KEY — check GitHub Secret!")
 
-                # Model not found - skip to next model
                 if r.status_code == 404:
                     print(f"  Model unavailable, trying next...")
                     last_error = f"{model} not found"
                     break
 
-                # Rate limit or overloaded - wait and retry
                 if r.status_code in [429, 503] or \
                    any(x in err for x in ["quota", "overload", "demand", "busy"]):
                     waits = [5, 15, 30]
@@ -171,16 +167,16 @@ def parse_response(result):
     return json.loads(raw)
 
 
-def generate_script(fruit_name):
+def generate_script(topic_name):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY not set in GitHub Secrets!")
-    prompt = build_prompt(fruit_name)
+    prompt = build_prompt(topic_name)
     result = call_gemini(prompt, api_key)
     data = parse_response(result)
     assert len(data.get("description", "")) > 30, "Description too short"
     assert len(data.get("voiceover", {}).get("fact_1", "")) > 10, "Fact 1 missing"
-    print(f"\nScript generated for: {fruit_name}")
+    print(f"\nScript generated for: {topic_name}")
     return data
 
 
@@ -193,6 +189,6 @@ def save_output(data):
 
 
 if __name__ == "__main__":
-    fruit = get_next_fruit()
-    data = generate_script(fruit)
+    topic = get_next_topic()
+    data = generate_script(topic)
     save_output(data)

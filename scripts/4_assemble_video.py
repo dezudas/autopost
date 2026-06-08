@@ -248,7 +248,7 @@ def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
               fill=(30, 30, 30), anchor="mm")
 
     # Channel name top-right
-    draw.text((W-30, 90), "Fruits with Facts",
+    draw.text((W-30, 90), "Guitar with Facts",
               fill=(255, 255, 255), anchor="rm")
 
     # Small progress dots at bottom
@@ -294,7 +294,7 @@ def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output
     draw.text((145, 90), "INTRO", fill=(30, 30, 30), anchor="mm")
 
     # Channel name top-right
-    draw.text((W-30, 90), "Fruits with Facts", fill=(255, 255, 255), anchor="rm")
+    draw.text((W-30, 90), "Guitar with Facts", fill=(255, 255, 255), anchor="rm")
 
     # Bottom CTA (small)
     draw.text((W//2, H-90), "Watch till the end!",
@@ -358,8 +358,8 @@ def create_outro_card(fruit_name, emoji, colors, output_path):
     styled_text((W//2, 840), "LIKE & SUBSCRIBE", font=font_xl,
                 fill=accent, outline=(0,0,0), outline_width=5)
 
-    # "for more fruity facts!" — medium white
-    styled_text((W//2, 1000), "for more fruity facts!", font=font_medium,
+    # "for more guitar facts!" — medium white
+    styled_text((W//2, 1000), "for more guitar facts!", font=font_medium,
                 fill=(255,255,255), outline=(0,0,0), outline_width=3)
 
     # Decorative line
@@ -372,7 +372,7 @@ def create_outro_card(fruit_name, emoji, colors, output_path):
                 fill=accent, outline=(0,0,0), outline_width=5)
 
     # Hashtag at very bottom
-    styled_text((W//2, 1700), "#Shorts #FruitFacts", font=font_medium,
+    styled_text((W//2, 1700), "#Shorts #GuitarFacts", font=font_medium,
                 fill=(255,255,255,200), outline=(0,0,0), outline_width=2)
 
     img.save(output_path, "PNG", optimize=False)
@@ -427,7 +427,7 @@ def create_subtitles(data, thumbnail_offset=1.5):
 
 # ── Main video assembly with TWO-PASS approach (faster) ──────────────────────
 def assemble_video(data, srt_path, music_path):
-    fruit  = data["fruit"]
+    fruit  = data["topic"]
     emoji  = data.get("emoji", "🍎")
     colors = data.get("colors", {})
     vo     = data["voiceover"]

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-Fully automated faceless YouTube Shorts channel. Every Monday, Wednesday, and Friday at 9AM UTC, GitHub Actions runs a 5-step Python pipeline that picks the next fruit from `fruits_list.txt`, generates a script via Gemini AI, synthesises a voiceover, creates AI images, assembles an MP4 with burned-in subtitles, and uploads the Short to YouTube. After upload, `fruits_done.txt` is committed back to the repo so the bot remembers where it left off.
+Fully automated faceless YouTube Shorts channel. Every Monday, Wednesday, and Friday at 9AM UTC, GitHub Actions runs a 5-step Python pipeline that picks the next fruit from `list.txt`, generates a script via Gemini AI, synthesises a voiceover, creates AI images, assembles an MP4 with burned-in subtitles, and uploads the Short to YouTube. After upload, `done.txt` is committed back to the repo so the bot remembers where it left off.
 
 ## Pipeline Steps (run in order)
 
@@ -48,8 +48,8 @@ Required environment variables:
 - `final_video.mp4` — finished Short
 
 **Fruit tracking:**
-- `fruits_list.txt` — ordered list; add new fruits here (one per line)
-- `fruits_done.txt` — auto-appended after each successful upload; the bot skips any fruit already in this file
+- `list.txt` — ordered list; add new fruits here (one per line)
+- `done.txt` — auto-appended after each successful upload; the bot skips any fruit already in this file
 
 **Voice fallback chain** (step 2): HuggingFace Kokoro-82M → gTTS → espeak-ng
 
@@ -78,5 +78,5 @@ Required environment variables:
 
 - **`invalid_grant` on YouTube upload** — refresh token expired; repeat the OAuth flow and update the secret
 - **Gradient images instead of fruit photos** — Pollinations timed out; re-run the workflow
-- **All fruits completed** — add more lines to `fruits_list.txt`
+- **All fruits completed** — add more lines to `list.txt`
 - **`GEMINI_API_KEY not set`** — secret missing or misnamed in GitHub repo settings

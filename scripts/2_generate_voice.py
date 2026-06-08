@@ -209,7 +209,7 @@ def combine_audio(segment_files, output_path):
 if __name__ == "__main__":
     data = load_video_data()
     vo = data["voiceover"]
-    fruit = data["fruit"]
+    topic = data["topic"]
 
     os.makedirs("output/audio/segments", exist_ok=True)
 
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     # Hugging Face API key from environment
     HF_API_KEY = os.environ.get("HF_API_KEY")
 
-    print(f"=== Generating voice for: {fruit} ===")
+    print(f"=== Generating voice for: {topic} ===")
     if HF_API_KEY:
         print(f"Engine: Hugging Face Kokoro (high-quality neural)")
         print(f"Voice: {VOICE_NAME} ({KOKORO_VOICES.get(VOICE_NAME, 'N/A')})")

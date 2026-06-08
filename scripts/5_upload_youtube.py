@@ -33,9 +33,9 @@ def build_description(fruit_name, raw_desc, tags):
     clean = "\n".join(lines).strip()
 
     hashtags = [
-        "Shorts", "FruitsWithFacts", fruit_name.replace(" ",""),
-        "FruitFacts", "DidYouKnow", "HealthyFood",
-        "NutritionFacts", "FoodFacts", "Educational", "LearnOnShorts"
+        "Shorts", "GuitarWithFacts", fruit_name.replace(" ",""),
+        "GuitarFacts", "DidYouKnow", "GuitarChords",
+        "MusicTheory", "GuitarTips", "Educational", "LearnOnShorts"
     ]
     for tag in tags[:5]:
         h = tag.replace(" ","").replace("-","")
@@ -135,14 +135,14 @@ def upload_thumbnail(token, video_id):
 
 
 def mark_done(fruit):
-    with open("fruits_done.txt", "a") as f:
+    with open("done.txt", "a") as f:
         f.write(f"{fruit}\n")
     print(f"Marked done: {fruit}")
 
 
 if __name__ == "__main__":
     data   = load_video_data()
-    fruit  = data["fruit"]
+    fruit  = data["topic"]
     title  = data["title"]
     tags   = data["tags"]
     desc   = build_description(fruit, data["description"], tags)

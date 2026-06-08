@@ -163,7 +163,7 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
     # Round the corners a bit for a more polished look
     draw.rounded_rectangle([(40, banner_top), (W-40, banner_bot)],
                            radius=30, fill=primary, outline=accent, width=4)
-    draw_outlined_text(draw, (W//2, banner_top + 60),  "FRUITS WITH FACTS",
+    draw_outlined_text(draw, (W//2, banner_top + 60),  "GUITAR WITH FACTS",
                        font=font_medium, fill=(255,255,255), outline_width=3)
     draw_outlined_text(draw, (W//2, banner_top + 130), "Educational Shorts",
                        font=font_small, fill=(255,230,180), outline_width=2)
@@ -215,7 +215,7 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
 
     # ── Footer ────────────────────────────────────────────────────────────────
     draw.rectangle([(0, 1810), (W, H)], fill=primary)
-    draw_outlined_text(draw, (W//2, 1865), "#Shorts #FruitFacts",
+    draw_outlined_text(draw, (W//2, 1865), "#Shorts #GuitarFacts",
                        font=font_small, fill=(255,255,255), outline_width=2)
 
     img.save(output_path, "PNG", quality=95)
@@ -248,7 +248,7 @@ def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
 
     # Top banner
     draw.rectangle([(0, 0), (W, 70)], fill=primary)
-    draw_outlined_text(draw, (W//2, 35), "FRUITS WITH FACTS",
+    draw_outlined_text(draw, (W//2, 35), "GUITAR WITH FACTS",
                        font=font_medium, fill=(255,255,255), outline_width=2)
 
     # Smaller left circle with "5"
@@ -274,7 +274,7 @@ def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
 
     # Bottom banner
     draw.rectangle([(0, 660), (W, H)], fill=primary)
-    draw_outlined_text(draw, (W//2, 690), "#Shorts #FruitFacts",
+    draw_outlined_text(draw, (W//2, 690), "#Shorts #GuitarFacts",
                        font=font_medium, fill=(255,255,255), outline_width=2)
 
     img.save(output_path, "JPEG", quality=95)
@@ -316,8 +316,8 @@ def create_beautiful_thumbnails(fruit_name, emoji, colors, image_paths):
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     data = load_video_data()
-    fruit = data["fruit"]
-    emoji = data.get("emoji", "🍎")
+    fruit = data["topic"]
+    emoji = data.get("emoji", "🎸")
     colors = data.get("colors", {})
     prompts = data["image_prompts"]
 
