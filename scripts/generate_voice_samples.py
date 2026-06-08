@@ -81,7 +81,7 @@ async def main():
     # Create a guide document
     with open("voice_samples/_GUIDE.txt", "w") as f:
         f.write("=" * 60 + "\n")
-        f.write("VOICE SAMPLES — Fruits with Facts\n")
+        f.write("VOICE SAMPLES — Guitar with Facts\n")
         f.write("=" * 60 + "\n\n")
         f.write("Listen to each MP3 file and pick your favorite!\n\n")
         f.write("Tell Claude the voice ID you want, e.g.:\n")

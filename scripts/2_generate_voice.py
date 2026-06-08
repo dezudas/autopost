@@ -54,14 +54,17 @@ KOKORO_VOICES = {
 def huggingface_tts(text, output_path, voice="af_bella", api_key=None):
     """
     Use Hugging Face Inference API with Kokoro-82M model.
-    This is the highest quality FREE TTS available.
+    Tries the newer router endpoint first, falls back to legacy endpoint.
     """
     if not api_key:
         print(f"  No HF_API_KEY set, skipping Hugging Face")
         return False
 
-    # Hugging Face Kokoro model endpoint
-    API_URL = "https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M"
+    # Try newer router endpoint first, then legacy endpoint
+    API_URLS = [
+        "https://router.huggingface.co/hf-inference/models/hexgrad/Kokoro-82M",
+        "https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M",
+    ]
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -75,44 +78,46 @@ def huggingface_tts(text, output_path, voice="af_bella", api_key=None):
         }
     }
 
-    # Retry up to 3 times - HF models can be "loading" first time
-    for attempt in range(3):
-        try:
-            print(f"    HF attempt {attempt+1}/3 (voice={voice})")
-            r = requests.post(API_URL, headers=headers, json=payload, timeout=120)
-            print(f"    Status: {r.status_code}, Size: {len(r.content)} bytes")
+    for api_url in API_URLS:
+        print(f"    Trying: {api_url}")
+        for attempt in range(3):
+            try:
+                print(f"    HF attempt {attempt+1}/3 (voice={voice})")
+                r = requests.post(api_url, headers=headers, json=payload, timeout=120)
+                print(f"    Status: {r.status_code}, Size: {len(r.content)} bytes")
 
-            if r.status_code == 200 and len(r.content) > 1000:
-                # Check if it's audio data (not JSON error)
-                if r.content[:4] in [b'RIFF', b'OggS', b'\xff\xfb', b'\xff\xf3', b'ID3\x04']:
-                    with open(output_path, "wb") as f:
-                        f.write(r.content)
-                    return True
-                else:
-                    # Try parsing as JSON to see if it's an error
-                    try:
-                        err = r.json()
-                        print(f"    HF response: {err}")
-                    except:
-                        # Maybe it IS audio just in unknown format
+                if r.status_code == 200 and len(r.content) > 1000:
+                    if r.content[:4] in [b'RIFF', b'OggS', b'\xff\xfb', b'\xff\xf3', b'ID3\x04']:
                         with open(output_path, "wb") as f:
                             f.write(r.content)
                         return True
+                    else:
+                        try:
+                            err = r.json()
+                            print(f"    HF response: {err}")
+                        except:
+                            with open(output_path, "wb") as f:
+                                f.write(r.content)
+                            return True
 
-            elif r.status_code == 503:
-                # Model loading, wait and retry
-                print(f"    Model loading, waiting 20s...")
-                time.sleep(20)
-            else:
-                try:
-                    err = r.json()
-                    print(f"    HF error: {err}")
-                except:
-                    print(f"    HF error: {r.text[:300]}")
-                return False
-        except Exception as e:
-            print(f"    Exception: {e}")
-            time.sleep(5)
+                elif r.status_code == 503:
+                    print(f"    Model loading, waiting 20s...")
+                    time.sleep(20)
+                else:
+                    try:
+                        err = r.json()
+                        print(f"    HF error: {err}")
+                    except:
+                        print(f"    HF error: {r.text[:300]}")
+                    break  # non-retriable error, try next URL
+
+            except requests.exceptions.ConnectionError as e:
+                # DNS failure or unreachable — no point retrying same URL
+                print(f"    Connection failed (DNS/network): {e}")
+                break
+            except Exception as e:
+                print(f"    Exception: {e}")
+                time.sleep(5)
 
     return False
 
