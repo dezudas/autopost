@@ -1,4 +1,4 @@
-name: Generate & Upload Short
+name: Generate & Upload Fruits Short
 
 on:
   schedule:
@@ -8,7 +8,7 @@ on:
 jobs:
   generate-video:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
@@ -39,7 +39,9 @@ jobs:
           HF_API_KEY: ${{ secrets.HF_API_KEY }}
         run: python scripts/2_generate_voice.py
 
-      - name: Step 3 - Generate Vertical Images (Pollinations AI)
+      - name: Step 3 - Generate Images (Unsplash + Pollinations fallback)
+        env:
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: python scripts/3_generate_images.py
 
       - name: Step 4 - Assemble Interactive Shorts Video
@@ -52,16 +54,15 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/5_upload_youtube.py
 
-
-      #- name: Step 6 - Upload to TikTok
-     #   env:
-      #    TIKTOK_SESSION_ID: ${{ secrets.TIKTOK_SESSION_ID }}
-      #  run: python scripts/6_upload_tiktok.py
+      - name: Step 6 - Upload to TikTok
+        env:
+          TIKTOK_SESSION_ID: ${{ secrets.TIKTOK_SESSION_ID }}
+        run: python scripts/6_upload_tiktok.py
 
       - name: Save progress
         run: |
           git config --global user.name "Fruits Bot"
           git config --global user.email "bot@fruitsbot.com"
-          git add done.txt
+          git add fruits_done.txt
           git diff --staged --quiet || git commit -m "Auto: marked fruit as done"
           git push
