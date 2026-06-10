@@ -294,7 +294,7 @@ def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
                        outline_width=3, anchor="lm")
 
     draw.rectangle([(0, 660), (W, H)], fill=primary)
-    draw_outlined_text(draw, (W//2, 690), "#Shorts #FruitFacts",
+    draw_outlined_text(draw, (W//2, 690), "#Shorts #GuitarFacts",
                        font=font_medium, fill=(255,255,255), outline_width=2)
 
     img.save(output_path, "JPEG", quality=95)
@@ -304,8 +304,8 @@ def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     data       = load_video_data()
-    fruit      = data["fruit"]
-    emoji      = data.get("emoji", "🍎")
+    topic      = data["topic"]
+    emoji      = data.get("emoji", "🎸")
     colors     = data.get("colors", {})
 
     primary   = hex_to_rgb(colors.get("primary",   "#FF6B35"))
@@ -316,19 +316,19 @@ if __name__ == "__main__":
 
     os.makedirs("output/images", exist_ok=True)
 
-    # Search queries for 5 different angles of the fruit
+    # Search queries for 5 different angles of the guitar topic
     search_queries = [
-        f"{fruit} fruit white background",
-        f"{fruit} fresh food photography",
-        f"{fruit} tree nature growing",
-        f"fresh {fruit} close up macro",
-        f"{fruit} bowl healthy food",
+        f"{topic} guitar white background",
+        f"{topic} guitar close up photography",
+        f"guitarist playing {topic} stage",
+        f"{topic} guitar fretboard macro",
+        f"acoustic electric guitar {topic}",
     ]
 
     image_paths  = []
     attributions = []
 
-    print(f"=== Generating images for: {fruit} ===")
+    print(f"=== Generating images for: {topic} ===")
 
     if access_key:
         print(f"Using Unsplash API (professional photos)")
@@ -369,9 +369,9 @@ if __name__ == "__main__":
 
     # Create thumbnails
     print("\nCreating thumbnails...")
-    create_vertical_thumbnail(fruit, emoji, primary, accent, secondary,
+    create_vertical_thumbnail(topic, emoji, primary, accent, secondary,
                               image_paths[0], "output/thumbnail_vertical.png")
-    create_horizontal_thumbnail(fruit, emoji, primary, accent, secondary,
+    create_horizontal_thumbnail(topic, emoji, primary, accent, secondary,
                                 image_paths[0], "output/thumbnail.jpg")
 
     print(f"\nDone! {len(image_paths)} images ready")
