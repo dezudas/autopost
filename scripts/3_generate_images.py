@@ -1,5 +1,5 @@
 """
-Step 3: Generate fruit images using Unsplash API
+Step 3: Generate guitar images using Unsplash API
 - FREE (50 requests/hour, no credit card)
 - Real professional photography (much better than AI generated!)
 - Fast CDN — images download in 1-2 seconds

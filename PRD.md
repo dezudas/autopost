@@ -99,7 +99,7 @@ done.txt  ◄── git commit (marks topic complete)
 - `output/audio/segments/{name}.mp3` — 7 individual segments
 - `output/audio/final_voiceover.mp3` — concatenated with 0.25 s silence between segments
 
-**Known issue:** The CI workflow (`generate_video.yml`) does **not** pass `HF_API_KEY` as an env var to Step 2, so the neural Kokoro voice is never used in CI — it always falls back to gTTS. Requires adding the env block to the workflow step.
+**CI:** `HF_API_KEY` is passed as an env var to Step 2 in `generate_video.yml`; Kokoro will be used when the secret is set.
 
 ---
 
@@ -192,11 +192,7 @@ done.txt  ◄── git commit (marks topic complete)
 git add done.txt && git commit -m "Auto: marked topic as done" && git push
 ```
 
-**Missing env vars in workflow:**
-- Step 2 (`2_generate_voice.py`) does not have `HF_API_KEY` injected → always falls back to gTTS.
-- Step 3 (`3_generate_images.py`) does not have `UNSPLASH_ACCESS_KEY` injected → always falls back to Pollinations / gradient.
-
-Both secrets are documented but not wired into the workflow steps.
+**Env vars:** Both `HF_API_KEY` (Step 2) and `UNSPLASH_ACCESS_KEY` (Step 3) are wired into their respective workflow steps.
 
 ---
 
@@ -210,11 +206,11 @@ Both secrets are documented but not wired into the workflow steps.
 
 ## 6. Identified Bugs & Inconsistencies
 
-| # | File | Severity | Description |
-|---|---|---|---|
-| 1 | `generate_video.yml` | Medium | `HF_API_KEY` not passed to Step 2 → Kokoro TTS never used in CI |
-| 2 | `generate_video.yml` | Low | `UNSPLASH_ACCESS_KEY` not passed to Step 3 → professional photos never fetched in CI |
-| 3 | `generate_video.yml` | Low | Step 6 (TikTok) not included in workflow at all |
+| # | File | Severity | Status | Description |
+|---|---|---|---|---|
+| 1 | `generate_video.yml` | Medium | ✅ Fixed | `HF_API_KEY` not passed to Step 2 → Kokoro TTS never used in CI |
+| 2 | `generate_video.yml` | Low | ✅ Fixed | `UNSPLASH_ACCESS_KEY` not passed to Step 3 → professional photos never fetched in CI |
+| 3 | `generate_video.yml` | Low | Open | Step 6 (TikTok) commented out in workflow — not run in CI |
 
 ---
 
@@ -280,7 +276,7 @@ output/
 
 ## 10. Roadmap / Recommended Next Steps
 
-1. **Wire missing env vars in CI** (Bugs #1–2): Add `HF_API_KEY` and `UNSPLASH_ACCESS_KEY` env blocks to their respective workflow steps to enable Kokoro TTS and Unsplash photos in CI.
+1. ~~**Wire missing env vars in CI** (Bugs #1–2)~~ — Done. `HF_API_KEY` and `UNSPLASH_ACCESS_KEY` are now wired into the workflow.
 2. **Add TikTok to CI** (Bug #3): Add Step 6 to the workflow (non-blocking — already exits 0 on failure so YouTube upload is never skipped).
 3. **Unsplash attribution compliance**: Unsplash requires crediting the photographer. Consider appending attribution from `image_credits.json` to the YouTube video description.
 4. **TikTok auth improvement**: Replace session-cookie auth with the official TikTok Creator API for more reliable, non-expiring uploads.
