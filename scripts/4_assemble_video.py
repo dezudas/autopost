@@ -366,7 +366,7 @@ def create_outro_card(fruit_name, emoji, colors, output_path):
     draw.rectangle([(200, 1180), (W-200, 1190)], fill=(255,255,255))
 
     # Channel name — biggest at the bottom
-    styled_text((W//2, 1330), "Fruits", font=font_huge,
+    styled_text((W//2, 1330), "Guitar", font=font_huge,
                 fill=(255,255,255), outline=(0,0,0), outline_width=5)
     styled_text((W//2, 1480), "with FACTS", font=font_huge,
                 fill=accent, outline=(0,0,0), outline_width=5)

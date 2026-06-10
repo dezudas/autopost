@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-Fully automated faceless YouTube Shorts channel. Every Monday, Wednesday, and Friday at 9AM UTC, GitHub Actions runs a 5-step Python pipeline that picks the next fruit from `list.txt`, generates a script via Gemini AI, synthesises a voiceover, creates AI images, assembles an MP4 with burned-in subtitles, and uploads the Short to YouTube. After upload, `done.txt` is committed back to the repo so the bot remembers where it left off.
+Fully automated faceless YouTube Shorts channel. Every Monday, Wednesday, and Friday at 9AM UTC, GitHub Actions runs a 5-step Python pipeline that picks the next guitar topic from `list.txt`, generates a script via Gemini AI, synthesises a voiceover, creates AI images, assembles an MP4 with burned-in subtitles, and uploads the Short to YouTube. After upload, `done.txt` is committed back to the repo so the bot remembers where it left off.
 
 ## Pipeline Steps (run in order)
 
@@ -13,7 +13,7 @@ python scripts/1_generate_script.py   # Gemini AI → output/video_data.json
 python scripts/2_generate_voice.py    # HF Kokoro / gTTS / espeak → output/audio/
 python scripts/3_generate_images.py   # Pollinations AI → output/images/ + thumbnails
 python scripts/4_assemble_video.py    # FFmpeg → output/final_video.mp4
-python scripts/5_upload_youtube.py    # YouTube Data API v3 → marks fruit done
+python scripts/5_upload_youtube.py    # YouTube Data API v3 → marks topic done
 ```
 
 Each script reads from the previous step's `output/` directory. Run them sequentially; they don't accept CLI arguments.
@@ -38,18 +38,18 @@ Required environment variables:
 ## Architecture
 
 **`output/` directory** (created at runtime, not committed):
-- `video_data.json` — shared data bus between all steps; contains fruit name, title, description, tags, voiceover lines, image prompts, colors, and emoji
+- `video_data.json` — shared data bus between all steps; contains topic name, title, description, tags, voiceover lines, image prompts, colors, and emoji
 - `audio/segments/*.mp3` — one file per voiceover segment (hook + 5 facts + outro)
 - `audio/final_voiceover.mp3` — concatenated segments with 0.25s silence between each
-- `images/scene_N.png` — 5 vertical (1080×1920) fruit images from Pollinations
+- `images/scene_N.png` — 5 vertical (1080×1920) guitar images from Unsplash / Pollinations
 - `thumbnail_vertical.png` / `thumbnail.jpg` — composed thumbnails (PIL)
 - `cards/*.png` — per-segment background frames used in video assembly
 - `clips/clip_N.mp4` — animated clips (zoom/pan) before final concat
 - `final_video.mp4` — finished Short
 
-**Fruit tracking:**
-- `list.txt` — ordered list; add new post here (one per line)
-- `done.txt` — auto-appended after each successful upload; the bot skips any fruit already in this file
+**Topic tracking:**
+- `list.txt` — ordered list of guitar topics; add new topics here (one per line)
+- `done.txt` — auto-appended after each successful upload; the bot skips any topic already in this file
 
 **Voice fallback chain** (step 2): HuggingFace Kokoro-82M → gTTS → espeak-ng
 
@@ -77,6 +77,6 @@ Required environment variables:
 ## Common Issues
 
 - **`invalid_grant` on YouTube upload** — refresh token expired; repeat the OAuth flow and update the secret
-- **Gradient images instead of fruit photos** — Pollinations timed out; re-run the workflow
+- **Gradient images instead of guitar photos** — Pollinations timed out; re-run the workflow
 - **All post completed** — add more lines to `list.txt`
 - **`GEMINI_API_KEY not set`** — secret missing or misnamed in GitHub repo settings

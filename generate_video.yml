@@ -52,8 +52,8 @@ jobs:
 
       - name: Save progress
         run: |
-          git config --global user.name "Fruits Bot"
-          git config --global user.email "bot@fruitsbot.com"
+          git config --global user.name "Guitar Bot"
+          git config --global user.email "bot@guitarbot.com"
           git add done.txt
-          git diff --staged --quiet || git commit -m "Auto: marked fruit as done"
+          git diff --staged --quiet || git commit -m "Auto: marked topic as done"
           git push

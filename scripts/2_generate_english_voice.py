@@ -214,7 +214,7 @@ def generate_segment_lang(text, output_path, lang="en", voice_tld="com"):
 if __name__ == "__main__":
     data = load_video_data()
     vo = data["voiceover"]
-    fruit = data["fruit"]
+    fruit = data["topic"]
 
     os.makedirs("output/audio/segments", exist_ok=True)
 

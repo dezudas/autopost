@@ -212,7 +212,7 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
     banner_top, banner_bot = 80, 250
     draw.rounded_rectangle([(40, banner_top), (W-40, banner_bot)],
                            radius=30, fill=primary, outline=accent, width=4)
-    draw_outlined_text(draw, (W//2, banner_top+60), "FRUITS WITH FACTS",
+    draw_outlined_text(draw, (W//2, banner_top+60), "GUITAR WITH FACTS",
                        font=font_medium, fill=(255,255,255), outline_width=3)
     draw_outlined_text(draw, (W//2, banner_top+130), "Educational Shorts",
                        font=font_small, fill=(255,230,180), outline_width=2)
@@ -249,7 +249,7 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
 
     # Footer
     draw.rectangle([(0, 1810), (W, H)], fill=primary)
-    draw_outlined_text(draw, (W//2, 1865), "#Shorts #FruitFacts",
+    draw_outlined_text(draw, (W//2, 1865), "#Shorts #GuitarFacts",
                        font=font_small, fill=(255,255,255), outline_width=2)
 
     img.save(output_path, "PNG", quality=95)
@@ -273,7 +273,7 @@ def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
     font_medium = find_font(50,  bold=True)
 
     draw.rectangle([(0, 0), (W, 70)], fill=primary)
-    draw_outlined_text(draw, (W//2, 35), "FRUITS WITH FACTS",
+    draw_outlined_text(draw, (W//2, 35), "GUITAR WITH FACTS",
                        font=font_medium, fill=(255,255,255), outline_width=2)
 
     draw.ellipse([(120, 200), (480, 560)], fill=accent, outline=(0,0,0), width=6)

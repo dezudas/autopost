@@ -10,10 +10,10 @@ import edge_tts
 
 # Same sample text for fair comparison
 SAMPLE_TEXT = (
-    "Welcome to Fruits with Facts! Today we are exploring the amazing mango. "
-    "Fact one! Mangoes are the national fruit of India, Pakistan, and the Philippines. "
-    "Fact two! A single mango tree can produce fruit for over 300 years. "
-    "Like and subscribe for more fruity facts!"
+    "Welcome to Guitar with Facts! Today we are exploring the amazing C Major Chord. "
+    "Fact one! The C Major chord is one of the first chords every guitarist learns. "
+    "Fact two! It uses three unique notes and can be played in over five positions on the neck. "
+    "Like and subscribe for more guitar facts!"
 )
 
 # Top 20 most natural-sounding free Edge TTS voices

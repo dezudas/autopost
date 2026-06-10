@@ -20,10 +20,10 @@ def load_video_data():
 
 def build_description(fruit_name, title, tags):
     hashtags = [
-        "FruitsWithFacts", "FruitFacts",
+        "GuitarWithFacts", "GuitarFacts",
         fruit_name.replace(" ", ""),
         "DidYouKnow", "LearnOnTikTok",
-        "HealthyFood", "FoodFacts",
+        "Guitar", "MusicTheory",
         "fyp", "foryoupage",
     ]
     for tag in tags[:5]:
@@ -330,7 +330,7 @@ def main():
     print(f"Session ID: {session_id[:8]}...{session_id[-4:]}")
 
     data       = load_video_data()
-    fruit      = data["fruit"]
+    fruit      = data["topic"]
     title      = data["title"]
     tags       = data.get("tags", [])
     video_path = "output/final_video.mp4"
@@ -342,7 +342,7 @@ def main():
     description = build_description(fruit, title, tags)
 
     print(f"\n=== Uploading to TikTok ===")
-    print(f"Fruit: {fruit}")
+    print(f"Topic: {fruit}")
     print(f"Caption: {description[:100]}...\n")
 
     success = upload_to_tiktok(video_path, description, session_id)

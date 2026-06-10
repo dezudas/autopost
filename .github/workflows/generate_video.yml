@@ -54,15 +54,15 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
         run: python scripts/5_upload_youtube.py
 
-      - name: Step 6 - Upload to TikTok
-        env:
-          TIKTOK_SESSION_ID: ${{ secrets.TIKTOK_SESSION_ID }}
-        run: python scripts/6_upload_tiktok.py
+      # - name: Step 6 - Upload to TikTok
+      #   env:
+      #     TIKTOK_SESSION_ID: ${{ secrets.TIKTOK_SESSION_ID }}
+      #   run: python scripts/6_upload_tiktok.py
 
       - name: Save progress
         run: |
-          git config --global user.name "Fruits Bot"
-          git config --global user.email "bot@fruitsbot.com"
+          git config --global user.name "Guitar Bot"
+          git config --global user.email "bot@guitarbot.com"
           git add fruits_done.txt
-          git diff --staged --quiet || git commit -m "Auto: marked fruit as done"
+          git diff --staged --quiet || git commit -m "Auto: marked topic as done"
           git push
