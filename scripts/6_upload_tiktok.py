@@ -357,5 +357,5 @@ def main():
         sys.exit(0)   # Don't fail the whole workflow
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

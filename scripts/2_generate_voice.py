@@ -8,7 +8,6 @@ Step 2: Generate natural voice using Hugging Face Inference API
 import json
 import os
 import subprocess
-import sys
 import time
 import requests
 
@@ -60,10 +59,8 @@ def huggingface_tts(text, output_path, voice="af_bella", api_key=None):
         print(f"  No HF_API_KEY set, skipping Hugging Face")
         return False
 
-    # Try newer router endpoint first, then legacy endpoint
     API_URLS = [
         "https://router.huggingface.co/hf-inference/models/hexgrad/Kokoro-82M",
-        "https://api-inference.huggingface.co/models/hexgrad/Kokoro-82M",
     ]
 
     headers = {

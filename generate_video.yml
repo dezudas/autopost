@@ -35,9 +35,13 @@ jobs:
         run: python scripts/1_generate_script.py
 
       - name: Step 2 - Generate Natural Voice (Edge TTS)
+        env:
+          HF_API_KEY: ${{ secrets.HF_API_KEY }}
         run: python scripts/2_generate_voice.py
 
       - name: Step 3 - Generate Vertical Images (Pollinations AI)
+        env:
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: python scripts/3_generate_images.py
 
       - name: Step 4 - Assemble Interactive Shorts Video
