@@ -23,14 +23,20 @@ import urllib.parse
 
 
 def find_font(size, bold=False):
-    candidates = []
+    # Prefer Poppins/Manrope (design.md), fall back to DejaVu on CI
     if bold:
         candidates = [
+            "/usr/share/fonts/truetype/poppins/Poppins-Bold.ttf",
+            "/usr/share/fonts/truetype/manrope/Manrope-Bold.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
         ]
     else:
         candidates = [
+            "/usr/share/fonts/truetype/poppins/Poppins-Regular.ttf",
+            "/usr/share/fonts/truetype/manrope/Manrope-Regular.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
         ]
@@ -48,7 +54,7 @@ def load_video_data():
         return json.load(f)
 
 
-def hex_to_rgb(hex_str, default=(255, 107, 53)):
+def hex_to_rgb(hex_str, default=(255, 193, 7)):  # default: #FFC107 (design.md primary)
     try:
         h = hex_str.lstrip("#")
         return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
@@ -213,19 +219,19 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
     draw.rounded_rectangle([(40, banner_top), (W-40, banner_bot)],
                            radius=30, fill=primary, outline=accent, width=4)
     draw_outlined_text(draw, (W//2, banner_top+60), "GUITAR WITH FACTS",
-                       font=font_medium, fill=(255,255,255), outline_width=3)
+                       font=font_medium, fill=(255,255,255), outline_width=3)   # on-dark
     draw_outlined_text(draw, (W//2, banner_top+130), "Educational Shorts",
-                       font=font_small, fill=(255,230,180), outline_width=2)
+                       font=font_small, fill=(255,255,255), outline_width=2)   # on-dark
 
     # Circle badge
     badge_y, cr = 540, 175
     draw.ellipse([(W//2-cr, badge_y-cr), (W//2+cr, badge_y+cr)],
                  fill=accent, outline=(0,0,0), width=7)
     draw_outlined_text(draw, (W//2, badge_y-25), "5",
-                       font=font_huge, fill=(20,20,20),
+                       font=font_huge, fill=(51,51,51),       # on-primary #333333
                        outline=(255,255,255), outline_width=4)
     draw_outlined_text(draw, (W//2, badge_y+110), "FACTS",
-                       font=find_font(55, bold=True), fill=(20,20,20),
+                       font=find_font(55, bold=True), fill=(51,51,51),  # on-primary #333333
                        outline=(255,255,255), outline_width=3)
 
     # Fruit name bar
@@ -233,15 +239,15 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
     draw.rounded_rectangle([(40, bar_y), (W-40, bar_y+bar_h)],
                            radius=40, fill=primary, outline=accent, width=10)
     draw_outlined_text(draw, (W//2, bar_y+60), "ABOUT",
-                       font=font_medium, fill=(255,255,255), outline_width=3)
+                       font=font_medium, fill=(255,255,255), outline_width=3)   # on-dark
     draw_outlined_text(draw, (W//2, bar_y+148), fruit_name.upper(),
-                       font=font_xl, fill=accent, outline=(0,0,0), outline_width=4)
+                       font=font_xl, fill=(51,51,51), outline=(0,0,0), outline_width=4)  # on-primary
 
     # Attention banner
     bnr_y = 1360
     draw.rounded_rectangle([(60, bnr_y), (W-60, bnr_y+130)], radius=30, fill=accent)
     draw_outlined_text(draw, (W//2, bnr_y+65), "FACT #3 IS WILD!",
-                       font=font_large, fill=secondary, outline=(0,0,0), outline_width=3)
+                       font=font_large, fill=(51,51,51), outline=(0,0,0), outline_width=3)  # on-primary
 
     # CTA
     draw_outlined_text(draw, (W//2, 1600), "WATCH NOW",
@@ -278,10 +284,10 @@ def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
 
     draw.ellipse([(120, 200), (480, 560)], fill=accent, outline=(0,0,0), width=6)
     draw_outlined_text(draw, (300, 350), "5",
-                       font=font_huge, fill=(20,20,20),
+                       font=font_huge, fill=(51,51,51),       # on-primary #333333
                        outline=(255,255,255), outline_width=3)
     draw_outlined_text(draw, (300, 490), "FACTS",
-                       font=find_font(60, bold=True), fill=(20,20,20),
+                       font=find_font(60, bold=True), fill=(51,51,51),  # on-primary #333333
                        outline=(255,255,255), outline_width=2)
 
     draw_outlined_text(draw, (620, 220), "ABOUT",
@@ -308,9 +314,10 @@ if __name__ == "__main__":
     emoji      = data.get("emoji", "🎸")
     colors     = data.get("colors", {})
 
-    primary   = hex_to_rgb(colors.get("primary",   "#FF6B35"))
-    accent    = hex_to_rgb(colors.get("accent",    "#FFE66D"))
-    secondary = hex_to_rgb(colors.get("secondary", "#C44A1F"))
+    # design.md: primary #FFC107, active #E0A800, light #FFF3CD
+    primary   = hex_to_rgb(colors.get("primary",   "#FFC107"))
+    accent    = hex_to_rgb(colors.get("accent",    "#FFF3CD"))
+    secondary = hex_to_rgb(colors.get("secondary", "#E0A800"))
 
     access_key = os.environ.get("UNSPLASH_ACCESS_KEY", "")
 

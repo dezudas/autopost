@@ -220,32 +220,28 @@ def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
     Subtitles handle the actual fact text.
     """
     try:
-        primary = tuple(int(colors.get("primary","#FF6B35").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        accent  = tuple(int(colors.get("accent", "#FFE66D").lstrip("#")[i:i+2],16) for i in (0,2,4))
+        primary = tuple(int(colors.get("primary","#FFC107").lstrip("#")[i:i+2],16) for i in (0,2,4))
+        accent  = tuple(int(colors.get("accent", "#FFF3CD").lstrip("#")[i:i+2],16) for i in (0,2,4))
     except:
-        primary, accent = (255,107,53), (255,230,109)
+        primary, accent = (255,193,7), (255,243,205)  # #FFC107, #FFF3CD
 
-    # Use the fruit image as background — NO blur (so it stays crisp)
     try:
         bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS)
     except:
         bg = Image.new("RGB", (W, H), primary)
 
-    # Very light overlay only at top/bottom for badge readability
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
-    # Top dark gradient (only top 200px)
     od.rectangle([(0, 0), (W, 180)], fill=(0, 0, 0, 130))
-    # Bottom dark gradient (only bottom 200px for progress dots)
     od.rectangle([(0, H-180), (W, H)], fill=(0, 0, 0, 130))
 
     card = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    # Small "FACT N/5" badge top-left
+    # Small "FACT N/5" badge — on-primary text #333333
     draw.rounded_rectangle([(30, 50), (260, 130)], radius=20, fill=accent)
     draw.text((145, 90), f"FACT {fact_num}/{total_facts}",
-              fill=(30, 30, 30), anchor="mm")
+              fill=(51, 51, 51), anchor="mm")  # on-primary #333333
 
     # Channel name top-right
     draw.text((W-30, 90), "Guitar with Facts",
@@ -269,18 +265,16 @@ def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
 def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output_path):
     """Minimal hook card — just fruit image with small badge. No big shapes."""
     try:
-        primary = tuple(int(colors.get("primary","#FF6B35").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        accent  = tuple(int(colors.get("accent", "#FFE66D").lstrip("#")[i:i+2],16) for i in (0,2,4))
+        primary = tuple(int(colors.get("primary","#FFC107").lstrip("#")[i:i+2],16) for i in (0,2,4))
+        accent  = tuple(int(colors.get("accent", "#FFF3CD").lstrip("#")[i:i+2],16) for i in (0,2,4))
     except:
-        primary, accent = (255,107,53), (255,230,109)
+        primary, accent = (255,193,7), (255,243,205)  # #FFC107, #FFF3CD
 
-    # Show fruit image clearly — no blur
     try:
         bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS)
     except:
         bg = Image.new("RGB", (W, H), primary)
 
-    # Light overlay only at top/bottom for badge readability
     overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
     od.rectangle([(0, 0), (W, 180)], fill=(0, 0, 0, 130))
@@ -289,9 +283,9 @@ def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output
     card = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    # Small badge top-left
+    # Badge — on-primary text #333333
     draw.rounded_rectangle([(30, 50), (260, 130)], radius=20, fill=accent)
-    draw.text((145, 90), "INTRO", fill=(30, 30, 30), anchor="mm")
+    draw.text((145, 90), "INTRO", fill=(51, 51, 51), anchor="mm")  # on-primary #333333
 
     # Channel name top-right
     draw.text((W-30, 90), "Guitar with Facts", fill=(255, 255, 255), anchor="rm")
@@ -306,12 +300,12 @@ def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output
 def create_outro_card(fruit_name, emoji, colors, output_path):
     """Stylish outro with BIG bold text and proper fonts."""
     try:
-        primary = tuple(int(colors.get("primary","#FF6B35").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        accent  = tuple(int(colors.get("accent", "#FFE66D").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        secondary = tuple(int(colors.get("secondary","#C44A1F").lstrip("#")[i:i+2],16) for i in (0,2,4))
+        primary   = tuple(int(colors.get("primary",  "#FFC107").lstrip("#")[i:i+2],16) for i in (0,2,4))
+        accent    = tuple(int(colors.get("accent",   "#FFF3CD").lstrip("#")[i:i+2],16) for i in (0,2,4))
+        secondary = tuple(int(colors.get("secondary","#E0A800").lstrip("#")[i:i+2],16) for i in (0,2,4))
     except:
-        primary, accent = (255,107,53), (255,230,109)
-        secondary = (196, 74, 31)
+        primary, accent = (255,193,7), (255,243,205)   # #FFC107, #FFF3CD
+        secondary = (224, 168, 0)                       # #E0A800
 
     # Gradient background (primary → secondary)
     img = Image.new("RGB", (W, H), primary)
@@ -323,12 +317,20 @@ def create_outro_card(fruit_name, emoji, colors, output_path):
         b = int(primary[2]*(1-ratio) + secondary[2]*ratio)
         draw.line([(0,i),(W,i)], fill=(r,g,b))
 
-    # Load BIG bold fonts (TrueType — actually visible)
+    # Load bold fonts — prefer Poppins/Manrope (design.md), fall back to DejaVu
+    _bold_fonts = [
+        "/usr/share/fonts/truetype/poppins/Poppins-Bold.ttf",
+        "/usr/share/fonts/truetype/manrope/Manrope-Bold.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]
+    _bold_path = next((p for p in _bold_fonts if os.path.exists(p)), None)
     try:
-        font_huge   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 130)
-        font_xl     = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 95)
-        font_large  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 80)
-        font_medium = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 60)
+        font_huge   = ImageFont.truetype(_bold_path, 130)
+        font_xl     = ImageFont.truetype(_bold_path, 95)
+        font_large  = ImageFont.truetype(_bold_path, 80)
+        font_medium = ImageFont.truetype(_bold_path, 60)
     except:
         font_huge = font_xl = font_large = font_medium = ImageFont.load_default()
 
