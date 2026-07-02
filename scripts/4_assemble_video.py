@@ -8,12 +8,88 @@ import json
 import os
 import subprocess
 import requests
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
-import textwrap
+from PIL import Image, ImageDraw, ImageFont
 
 
 W, H = 1080, 1920
 FPS = 24
+
+
+# ── Font utilities (Bebas Neue display + Poppins body) ────────────────────────
+_BEBAS_PATH = None
+
+
+def _download_bebas():
+    path = "output/fonts/BebasNeue-Regular.ttf"
+    if os.path.exists(path):
+        return path
+    os.makedirs("output/fonts", exist_ok=True)
+    url = "https://github.com/google/fonts/raw/main/ofl/bebasnew/BebasNeue-Regular.ttf"
+    try:
+        r = requests.get(url, timeout=15)
+        if r.status_code == 200 and len(r.content) > 10000:
+            with open(path, "wb") as f:
+                f.write(r.content)
+            return path
+    except Exception:
+        pass
+    return None
+
+
+def get_display_font(size):
+    global _BEBAS_PATH
+    if _BEBAS_PATH is None:
+        _BEBAS_PATH = _download_bebas() or ""
+    candidates = ([_BEBAS_PATH] if _BEBAS_PATH else []) + [
+        "/usr/share/fonts/truetype/poppins/Poppins-Bold.ttf",
+        "/usr/share/fonts/truetype/manrope/Manrope-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
+    for p in candidates:
+        if p and os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
+def get_body_font(size, bold=False):
+    w = "Bold" if bold else "Regular"
+    candidates = [
+        f"/usr/share/fonts/truetype/poppins/Poppins-{w}.ttf",
+        f"/usr/share/fonts/truetype/manrope/Manrope-{w}.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf" if bold
+            else "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold
+            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
+def draw_strings(base_rgba, y_center, n=6, spacing=13, opacity=55, color=(255, 193, 7)):
+    """Overlay n horizontal guitar-string lines centered at y_center."""
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(ov)
+    for i in range(n):
+        y = int(y_center + (i - n / 2 + 0.5) * spacing)
+        d.line([(0, y), (W, y)], fill=(*color, opacity), width=1)
+    return Image.alpha_composite(base_rgba, ov)
+
+
+def _outlined(draw, pos, text, font, fill, outline=(0, 0, 0), w=4):
+    x, y = pos
+    for dx in range(-w, w + 1):
+        for dy in range(-w, w + 1):
+            if dx * dx + dy * dy <= w * w:
+                draw.text((x + dx, y + dy), text, font=font, fill=outline, anchor="mm")
+    draw.text((x, y), text, font=font, fill=fill, anchor="mm")
 
 
 def load_video_data():
@@ -211,171 +287,154 @@ def create_animated_clip(card_image_path, duration, output_path, anim_type="zoom
 # ── Card creation functions (unchanged) ──────────────────────────────────────
 def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
                      emoji, colors, bg_image_path, output_path):
-    """
-    Minimal fact card — just shows the fruit image with:
-    - Small "FACT N/5" badge at top-left
-    - Channel name + hashtag at top-right
-    - Small progress dots at the bottom
-    - NO big circle or white rectangle covering the fruit!
-    Subtitles handle the actual fact text.
-    """
+    """Minimal fact card — photo with top/bottom dark strips, badge, and progress dots.
+    Subtitles handle the actual fact text."""
     try:
-        primary = tuple(int(colors.get("primary","#FFC107").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        accent  = tuple(int(colors.get("accent", "#FFF3CD").lstrip("#")[i:i+2],16) for i in (0,2,4))
-    except:
-        primary, accent = (255,193,7), (255,243,205)  # #FFC107, #FFF3CD
+        primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
+    except Exception:
+        primary = (255, 193, 7)
+
+    AMBER    = primary
+    ELECTRIC = (0, 229, 255)
+    WHITE    = (255, 255, 255)
+    SMOKE    = (155, 155, 155)
+    DARK     = (18, 16, 8)
 
     try:
         bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS)
-    except:
-        bg = Image.new("RGB", (W, H), primary)
+    except Exception:
+        bg = Image.new("RGB", (W, H), DARK)
 
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    od.rectangle([(0, 0), (W, 180)], fill=(0, 0, 0, 130))
-    od.rectangle([(0, H-180), (W, H)], fill=(0, 0, 0, 130))
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    od = ImageDraw.Draw(ov)
+    od.rectangle([(0, 0),       (W, 190)],  fill=(0, 0, 0, 155))
+    od.rectangle([(0, H - 220), (W, H)],    fill=(0, 0, 0, 165))
 
-    card = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
+    card = Image.alpha_composite(bg.convert("RGBA"), ov)
+    card = draw_strings(card, y_center=55,      n=6, opacity=50, color=AMBER)
+    card = draw_strings(card, y_center=H - 110, n=6, opacity=45, color=AMBER)
+    card = card.convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    # Small "FACT N/5" badge — on-primary text #333333
-    draw.rounded_rectangle([(30, 50), (260, 130)], radius=20, fill=accent)
-    draw.text((145, 90), f"FACT {fact_num}/{total_facts}",
-              fill=(51, 51, 51), anchor="mm")  # on-primary #333333
+    f_badge = get_body_font(38, bold=True)
+    f_chan  = get_body_font(30)
 
-    # Channel name top-right
-    draw.text((W-30, 90), "Guitar with Facts",
-              fill=(255, 255, 255), anchor="rm")
+    # Cyan "FACT N/5" pill — top left
+    bw, bh = 220, 68
+    draw.rounded_rectangle([(28, 28), (28 + bw, 28 + bh)], radius=34, fill=ELECTRIC)
+    draw.text((28 + bw // 2, 28 + bh // 2), f"FACT {fact_num}/{total_facts}",
+              font=f_badge, fill=DARK, anchor="mm")
 
-    # Small progress dots at bottom
-    dy = H - 200  # leave room for subtitles below
-    spacing = 50
-    total_w = (total_facts - 1) * spacing
-    sx = W//2 - total_w//2
+    # Channel name — top right
+    draw.text((W - 28, 62), "Guitar with Facts",
+              font=f_chan, fill=WHITE, anchor="rm")
+
+    # Progress dots — bottom right, above subtitle zone
+    dot_y   = H - 140
+    dot_gap = 42
+    total_w = (total_facts - 1) * dot_gap
+    sx = W - 50 - total_w
     for i in range(total_facts):
-        cx = sx + i * spacing
+        cx = sx + i * dot_gap
         if i + 1 == fact_num:
-            draw.ellipse([(cx-14, dy-14), (cx+14, dy+14)], fill=accent)
+            draw.ellipse([(cx - 12, dot_y - 12), (cx + 12, dot_y + 12)], fill=ELECTRIC)
         else:
-            draw.ellipse([(cx-8, dy-8), (cx+8, dy+8)], fill=(180, 180, 180))
+            draw.ellipse([(cx - 7,  dot_y - 7),  (cx + 7,  dot_y + 7)],  fill=SMOKE)
 
     card.save(output_path, "PNG", optimize=False)
 
 
 def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output_path):
-    """Minimal hook card — just fruit image with small badge. No big shapes."""
+    """Hook card — photo with dark strips, amber INTRO badge, string lines."""
     try:
-        primary = tuple(int(colors.get("primary","#FFC107").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        accent  = tuple(int(colors.get("accent", "#FFF3CD").lstrip("#")[i:i+2],16) for i in (0,2,4))
-    except:
-        primary, accent = (255,193,7), (255,243,205)  # #FFC107, #FFF3CD
+        primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
+    except Exception:
+        primary = (255, 193, 7)
+
+    AMBER = primary
+    WHITE = (255, 255, 255)
+    DARK  = (18, 16, 8)
 
     try:
         bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS)
-    except:
-        bg = Image.new("RGB", (W, H), primary)
+    except Exception:
+        bg = Image.new("RGB", (W, H), DARK)
 
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    od = ImageDraw.Draw(overlay)
-    od.rectangle([(0, 0), (W, 180)], fill=(0, 0, 0, 130))
-    od.rectangle([(0, H-180), (W, H)], fill=(0, 0, 0, 130))
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    od = ImageDraw.Draw(ov)
+    od.rectangle([(0, 0),       (W, 190)],  fill=(0, 0, 0, 155))
+    od.rectangle([(0, H - 220), (W, H)],    fill=(0, 0, 0, 165))
 
-    card = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
+    card = Image.alpha_composite(bg.convert("RGBA"), ov)
+    card = draw_strings(card, y_center=55,      n=6, opacity=50, color=AMBER)
+    card = draw_strings(card, y_center=H - 110, n=6, opacity=45, color=AMBER)
+    card = card.convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    # Badge — on-primary text #333333
-    draw.rounded_rectangle([(30, 50), (260, 130)], radius=20, fill=accent)
-    draw.text((145, 90), "INTRO", fill=(51, 51, 51), anchor="mm")  # on-primary #333333
+    f_badge = get_body_font(38, bold=True)
+    f_chan  = get_body_font(30)
+    f_cta   = get_body_font(36)
 
-    # Channel name top-right
-    draw.text((W-30, 90), "Guitar with Facts", fill=(255, 255, 255), anchor="rm")
+    # Amber "INTRO" pill — top left
+    bw, bh = 180, 68
+    draw.rounded_rectangle([(28, 28), (28 + bw, 28 + bh)], radius=34, fill=AMBER)
+    draw.text((28 + bw // 2, 28 + bh // 2), "INTRO",
+              font=f_badge, fill=DARK, anchor="mm")
 
-    # Bottom CTA (small)
-    draw.text((W//2, H-90), "Watch till the end!",
-              fill=(255, 255, 255), anchor="mm")
+    # Channel name — top right
+    draw.text((W - 28, 62), "Guitar with Facts",
+              font=f_chan, fill=WHITE, anchor="rm")
+
+    # Bottom CTA
+    draw.text((W // 2, H - 140), "Watch till the end!",
+              font=f_cta, fill=WHITE, anchor="mm")
 
     card.save(output_path, "PNG", optimize=False)
 
 
 def create_outro_card(fruit_name, emoji, colors, output_path):
-    """Stylish outro with BIG bold text and proper fonts."""
+    """Dark-stage outro: near-black background, electric cyan WATCHING splash, amber brand."""
     try:
-        primary   = tuple(int(colors.get("primary",  "#FFC107").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        accent    = tuple(int(colors.get("accent",   "#FFF3CD").lstrip("#")[i:i+2],16) for i in (0,2,4))
-        secondary = tuple(int(colors.get("secondary","#E0A800").lstrip("#")[i:i+2],16) for i in (0,2,4))
-    except:
-        primary, accent = (255,193,7), (255,243,205)   # #FFC107, #FFF3CD
-        secondary = (224, 168, 0)                       # #E0A800
+        primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
+    except Exception:
+        primary = (255, 193, 7)
 
-    # Gradient background (primary → secondary)
-    img = Image.new("RGB", (W, H), primary)
+    AMBER    = primary
+    ELECTRIC = (0, 229, 255)
+    WHITE    = (255, 255, 255)
+    SMOKE    = (140, 140, 140)
+    BG       = (18, 15, 8)
+
+    # Near-black warm background — subtle gradient
+    img = Image.new("RGB", (W, H), BG)
     draw = ImageDraw.Draw(img)
-    for i in range(H):
-        ratio = i / H
-        r = int(primary[0]*(1-ratio) + secondary[0]*ratio)
-        g = int(primary[1]*(1-ratio) + secondary[1]*ratio)
-        b = int(primary[2]*(1-ratio) + secondary[2]*ratio)
-        draw.line([(0,i),(W,i)], fill=(r,g,b))
+    for y in range(H):
+        r = max(0, BG[0] - int(10 * y / H))
+        g = max(0, BG[1] - int(9  * y / H))
+        b = max(0, BG[2] - int(6  * y / H))
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
 
-    # Load bold fonts — prefer Poppins/Manrope (design.md), fall back to DejaVu
-    _bold_fonts = [
-        "/usr/share/fonts/truetype/poppins/Poppins-Bold.ttf",
-        "/usr/share/fonts/truetype/manrope/Manrope-Bold.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    ]
-    _bold_path = next((p for p in _bold_fonts if os.path.exists(p)), None)
-    try:
-        font_huge   = ImageFont.truetype(_bold_path, 130)
-        font_xl     = ImageFont.truetype(_bold_path, 95)
-        font_large  = ImageFont.truetype(_bold_path, 80)
-        font_medium = ImageFont.truetype(_bold_path, 60)
-    except:
-        font_huge = font_xl = font_large = font_medium = ImageFont.load_default()
+    img_rgba = img.convert("RGBA")
+    img_rgba = draw_strings(img_rgba, y_center=280,  n=6, opacity=65, color=AMBER)
+    img_rgba = draw_strings(img_rgba, y_center=920,  n=6, opacity=45, color=WHITE)
+    img_rgba = draw_strings(img_rgba, y_center=1490, n=6, opacity=60, color=AMBER)
+    img = img_rgba.convert("RGB")
+    draw = ImageDraw.Draw(img)
 
-    # Helper for outlined text (looks stylish)
-    def styled_text(pos, text, font, fill, outline=(0,0,0), outline_width=4):
-        x, y = pos
-        for dx in range(-outline_width, outline_width+1):
-            for dy in range(-outline_width, outline_width+1):
-                if dx*dx + dy*dy > outline_width*outline_width:
-                    continue
-                draw.text((x+dx, y+dy), text, font=font, fill=outline, anchor="mm")
-        draw.text((x, y), text, font=font, fill=fill, anchor="mm")
+    f_big    = get_display_font(200)
+    f_huge   = get_display_font(130)
+    f_xl     = get_display_font(95)
+    f_medium = get_body_font(55, bold=True)
+    f_small  = get_body_font(36)
 
-    # ── BIG stylish text layout ──────────────────────────────────────────────
-    # "Thanks for" — big white
-    styled_text((W//2, 320), "Thanks for", font=font_xl,
-                fill=(255,255,255), outline=(0,0,0), outline_width=5)
-    # "WATCHING!" — HUGE accent color
-    styled_text((W//2, 460), "WATCHING!", font=font_huge,
-                fill=accent, outline=(0,0,0), outline_width=6)
-
-    # Decorative emoji line
-    styled_text((W//2, 670), "★ ★ ★ ★ ★", font=font_large,
-                fill=accent, outline=(0,0,0), outline_width=3)
-
-    # "LIKE & SUBSCRIBE" — bold yellow
-    styled_text((W//2, 840), "LIKE & SUBSCRIBE", font=font_xl,
-                fill=accent, outline=(0,0,0), outline_width=5)
-
-    # "for more guitar facts!" — medium white
-    styled_text((W//2, 1000), "for more guitar facts!", font=font_medium,
-                fill=(255,255,255), outline=(0,0,0), outline_width=3)
-
-    # Decorative line
-    draw.rectangle([(200, 1180), (W-200, 1190)], fill=(255,255,255))
-
-    # Channel name — biggest at the bottom
-    styled_text((W//2, 1330), "Guitar", font=font_huge,
-                fill=(255,255,255), outline=(0,0,0), outline_width=5)
-    styled_text((W//2, 1480), "with FACTS", font=font_huge,
-                fill=accent, outline=(0,0,0), outline_width=5)
-
-    # Hashtag at very bottom
-    styled_text((W//2, 1700), "#Shorts #GuitarFacts", font=font_medium,
-                fill=(255,255,255,200), outline=(0,0,0), outline_width=2)
+    _outlined(draw, (W//2, 420),  "Thanks for",          f_xl,    SMOKE,    w=2)
+    _outlined(draw, (W//2, 625),  "WATCHING",             f_big,   ELECTRIC, w=6)
+    _outlined(draw, (W//2, 800),  "!",                    f_huge,  AMBER,    w=5)
+    _outlined(draw, (W//2, 1055), "LIKE  &  SUBSCRIBE",  f_xl,    AMBER,    w=4)
+    draw.text((W//2, 1190), "for more guitar facts!", font=f_medium, fill=WHITE, anchor="mm")
+    _outlined(draw, (W//2, 1615), "GUITAR",               f_big,   WHITE,    w=6)
+    _outlined(draw, (W//2, 1795), "with FACTS",           f_huge,  AMBER,    w=5)
+    draw.text((W//2, 1900), "#Shorts  •  #GuitarFacts", font=f_small, fill=SMOKE, anchor="mm")
 
     img.save(output_path, "PNG", optimize=False)
 
@@ -538,15 +597,15 @@ def assemble_video(data, srt_path, music_path):
     # Then add audio + subtitles in single pass
     srt_esc = srt_path.replace("\\", "/").replace(":", "\\:")
     sub_style = (
-        "FontName=Arial,FontSize=14,Bold=1,"
-        "PrimaryColour=&H0000FFFF,"       # Bright YELLOW (colorful)
+        "FontName=Arial,FontSize=18,Bold=1,"
+        "PrimaryColour=&H00FFE500,"        # Electric cyan (#00E5FF in ASS BGR)
         "OutlineColour=&H00000000,"        # Black outline
         "BackColour=&H00000000,"           # Transparent
-        "BorderStyle=1,"                   # Outline only
-        "Outline=3,Shadow=1,"              # Strong outline
+        "BorderStyle=1,"
+        "Outline=4,Shadow=2,"
         "Alignment=2,"                     # Bottom center
-        "MarginV=50,"                      # ~1cm from bottom edge
-        "MarginL=80,MarginR=80"            # ~1cm side margins
+        "MarginV=60,"
+        "MarginL=80,MarginR=80"
     )
 
     # ── MINIMAL audio processing — gTTS is already clean ──────────────────

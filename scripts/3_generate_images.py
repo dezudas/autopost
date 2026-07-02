@@ -22,31 +22,76 @@ import io
 import urllib.parse
 
 
-def find_font(size, bold=False):
-    # Prefer Poppins/Manrope (design.md), fall back to DejaVu on CI
-    if bold:
-        candidates = [
-            "/usr/share/fonts/truetype/poppins/Poppins-Bold.ttf",
-            "/usr/share/fonts/truetype/manrope/Manrope-Bold.ttf",
-            "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        ]
-    else:
-        candidates = [
-            "/usr/share/fonts/truetype/poppins/Poppins-Regular.ttf",
-            "/usr/share/fonts/truetype/manrope/Manrope-Regular.ttf",
-            "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        ]
-    for path in candidates:
-        if os.path.exists(path):
+# ── Font utilities ────────────────────────────────────────────────────────────
+_BEBAS_PATH = None  # cached after first download
+
+
+def _download_bebas():
+    path = "output/fonts/BebasNeue-Regular.ttf"
+    if os.path.exists(path):
+        return path
+    os.makedirs("output/fonts", exist_ok=True)
+    url = "https://github.com/google/fonts/raw/main/ofl/bebasnew/BebasNeue-Regular.ttf"
+    try:
+        r = requests.get(url, timeout=15)
+        if r.status_code == 200 and len(r.content) > 10000:
+            with open(path, "wb") as f:
+                f.write(r.content)
+            print(f"  Bebas Neue downloaded → {path}")
+            return path
+    except Exception as e:
+        print(f"  Bebas Neue download failed: {e}")
+    return None
+
+
+def get_display_font(size):
+    """Bebas Neue for punchy display numbers/headlines; falls back to Poppins Bold."""
+    global _BEBAS_PATH
+    if _BEBAS_PATH is None:
+        _BEBAS_PATH = _download_bebas() or ""
+    candidates = ([_BEBAS_PATH] if _BEBAS_PATH else []) + [
+        "/usr/share/fonts/truetype/poppins/Poppins-Bold.ttf",
+        "/usr/share/fonts/truetype/manrope/Manrope-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ]
+    for p in candidates:
+        if p and os.path.exists(p):
             try:
-                return ImageFont.truetype(path, size)
-            except:
+                return ImageFont.truetype(p, size)
+            except Exception:
                 continue
     return ImageFont.load_default()
+
+
+def get_body_font(size, bold=False):
+    """Poppins / Manrope for readable badge and body text."""
+    w = "Bold" if bold else "Regular"
+    candidates = [
+        f"/usr/share/fonts/truetype/poppins/Poppins-{w}.ttf",
+        f"/usr/share/fonts/truetype/manrope/Manrope-{w}.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf" if bold
+            else "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold
+            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
+def draw_strings(base_rgba, y_center, n=6, spacing=13, opacity=55, color=(255, 193, 7)):
+    """Overlay n horizontal guitar-string lines centered at y_center (the channel's signature mark)."""
+    W, H = base_rgba.size
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(ov)
+    for i in range(n):
+        y = int(y_center + (i - n / 2 + 0.5) * spacing)
+        d.line([(0, y), (W, y)], fill=(*color, opacity), width=1)
+    return Image.alpha_composite(base_rgba, ov)
 
 
 def load_video_data():
@@ -201,62 +246,70 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
     W, H = 1080, 1920
     try:
         bg = Image.open(bg_image_path).convert("RGB").resize((W, H), Image.LANCZOS)
-    except:
-        bg = Image.new("RGB", (W, H), primary)
+    except Exception:
+        bg = Image.new("RGB", (W, H), (18, 16, 8))
 
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 90))
-    img = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
+    # Dark stage overlay: heavy strips at top/bottom, light tint in centre
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 90))
+    ovd = ImageDraw.Draw(ov)
+    ovd.rectangle([(0, 0),       (W, 370)],  fill=(0, 0, 0, 170))
+    ovd.rectangle([(0, H - 310), (W, H)],    fill=(0, 0, 0, 180))
+    img = Image.alpha_composite(bg.convert("RGBA"), ov)
+
+    # Guitar string lines — the channel's visual signature
+    AMBER    = primary
+    ELECTRIC = (0, 229, 255)
+    WHITE    = (255, 255, 255)
+    SMOKE    = (155, 155, 155)
+    DARK     = (18, 16, 8)
+
+    img = draw_strings(img, y_center=175,  opacity=55, color=AMBER)
+    img = draw_strings(img, y_center=1085, opacity=50, color=AMBER)
+    img = draw_strings(img, y_center=1110, opacity=25, color=WHITE)
+    img = img.convert("RGB")
     draw = ImageDraw.Draw(img)
 
-    font_huge   = find_font(220, bold=True)
-    font_xl     = find_font(95,  bold=True)
-    font_large  = find_font(75,  bold=True)
-    font_medium = find_font(55,  bold=True)
-    font_small  = find_font(40,  bold=True)
+    f_huge    = get_display_font(320)
+    f_sub     = get_display_font(88)
+    f_eyebrow = get_body_font(36, bold=True)
+    f_badge   = get_body_font(74, bold=True)
+    f_teaser  = get_body_font(46)
+    f_footer  = get_body_font(30)
 
-    # Top banner
-    banner_top, banner_bot = 80, 250
-    draw.rounded_rectangle([(40, banner_top), (W-40, banner_bot)],
-                           radius=30, fill=primary, outline=accent, width=4)
-    draw_outlined_text(draw, (W//2, banner_top+60), "GUITAR WITH FACTS",
-                       font=font_medium, fill=(255,255,255), outline_width=3)   # on-dark
-    draw_outlined_text(draw, (W//2, banner_top+130), "Educational Shorts",
-                       font=font_small, fill=(255,255,255), outline_width=2)   # on-dark
+    # Channel eyebrow
+    draw_outlined_text(draw, (W//2, 120), "GUITAR  WITH  FACTS",
+                       font=f_eyebrow, fill=SMOKE, outline=(0, 0, 0),
+                       outline_width=2, anchor="mm")
 
-    # Circle badge
-    badge_y, cr = 540, 175
-    draw.ellipse([(W//2-cr, badge_y-cr), (W//2+cr, badge_y+cr)],
-                 fill=accent, outline=(0,0,0), width=7)
-    draw_outlined_text(draw, (W//2, badge_y-25), "5",
-                       font=font_huge, fill=(51,51,51),       # on-primary #333333
-                       outline=(255,255,255), outline_width=4)
-    draw_outlined_text(draw, (W//2, badge_y+110), "FACTS",
-                       font=find_font(55, bold=True), fill=(51,51,51),  # on-primary #333333
-                       outline=(255,255,255), outline_width=3)
+    # Hero number — the dominant visual element
+    draw_outlined_text(draw, (W//2, 620), "5",
+                       font=f_huge, fill=AMBER, outline=(0, 0, 0),
+                       outline_width=8, anchor="mm")
 
-    # Fruit name bar
-    bar_y, bar_h = 1060, 210
-    draw.rounded_rectangle([(40, bar_y), (W-40, bar_y+bar_h)],
-                           radius=40, fill=primary, outline=accent, width=10)
-    draw_outlined_text(draw, (W//2, bar_y+60), "ABOUT",
-                       font=font_medium, fill=(255,255,255), outline_width=3)   # on-dark
-    draw_outlined_text(draw, (W//2, bar_y+148), fruit_name.upper(),
-                       font=font_xl, fill=(51,51,51), outline=(0,0,0), outline_width=4)  # on-primary
+    # "WILD FACTS" subtitle
+    draw_outlined_text(draw, (W//2, 825), "WILD  FACTS",
+                       font=f_sub, fill=WHITE, outline=(0, 0, 0),
+                       outline_width=4, anchor="mm")
 
-    # Attention banner
-    bnr_y = 1360
-    draw.rounded_rectangle([(60, bnr_y), (W-60, bnr_y+130)], radius=30, fill=accent)
-    draw_outlined_text(draw, (W//2, bnr_y+65), "FACT #3 IS WILD!",
-                       font=font_large, fill=(51,51,51), outline=(0,0,0), outline_width=3)  # on-primary
+    # Topic pill — clean, no border clutter
+    py, ph = 920, 130
+    draw.rounded_rectangle([(55, py), (W - 55, py + ph)], radius=65, fill=AMBER)
+    topic_disp = fruit_name.upper()
+    if len(topic_disp) > 18:
+        topic_disp = topic_disp[:17] + "…"
+    draw.text((W // 2, py + ph // 2), topic_disp,
+              font=f_badge, fill=DARK, anchor="mm")
 
-    # CTA
-    draw_outlined_text(draw, (W//2, 1600), "WATCH NOW",
-                       font=font_large, fill=accent, outline=(0,0,0), outline_width=4)
+    # Teaser in electric cyan
+    draw_outlined_text(draw, (W//2, 1290), "#3  WILL  SURPRISE  YOU",
+                       font=f_teaser, fill=ELECTRIC, outline=(0, 0, 0),
+                       outline_width=3, anchor="mm")
+    draw.rounded_rectangle([(W//2 - 105, 1370), (W//2 + 105, 1380)],
+                           radius=4, fill=ELECTRIC)
 
     # Footer
-    draw.rectangle([(0, 1810), (W, H)], fill=primary)
-    draw_outlined_text(draw, (W//2, 1865), "#Shorts #GuitarFacts",
-                       font=font_small, fill=(255,255,255), outline_width=2)
+    draw.text((W//2, 1855), "#Shorts  •  #GuitarFacts",
+              font=f_footer, fill=SMOKE, anchor="mm")
 
     img.save(output_path, "PNG", quality=95)
     print(f"Vertical thumbnail saved: {output_path}")
@@ -265,43 +318,60 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
 def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
                                 bg_image_path, output_path):
     W, H = 1280, 720
+    AMBER    = primary
+    ELECTRIC = (0, 229, 255)
+    WHITE    = (255, 255, 255)
+    SMOKE    = (155, 155, 155)
+    DARK     = (18, 16, 8)
+
     try:
         bg = Image.open(bg_image_path).convert("RGB").resize((W, H), Image.LANCZOS)
-    except:
-        bg = Image.new("RGB", (W, H), primary)
+    except Exception:
+        bg = Image.new("RGB", (W, H), DARK)
 
-    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 100))
-    img = Image.alpha_composite(bg.convert("RGBA"), overlay).convert("RGB")
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 140))
+    img = Image.alpha_composite(bg.convert("RGBA"), ov)
+    img = draw_strings(img, y_center=340, n=6, opacity=45, color=AMBER)
+    img = draw_strings(img, y_center=385, n=6, opacity=25, color=WHITE)
+    img = img.convert("RGB")
     draw = ImageDraw.Draw(img)
 
-    font_huge   = find_font(180, bold=True)
-    font_xl     = find_font(90,  bold=True)
-    font_medium = find_font(50,  bold=True)
+    f_giant  = get_display_font(260)
+    f_xl     = get_display_font(88)
+    f_medium = get_body_font(48, bold=True)
+    f_small  = get_body_font(30)
 
-    draw.rectangle([(0, 0), (W, 70)], fill=primary)
-    draw_outlined_text(draw, (W//2, 35), "GUITAR WITH FACTS",
-                       font=font_medium, fill=(255,255,255), outline_width=2)
+    # Left: huge "5" hero
+    draw_outlined_text(draw, (270, 330), "5",
+                       font=f_giant, fill=AMBER, outline=(0, 0, 0),
+                       outline_width=7, anchor="mm")
+    draw_outlined_text(draw, (270, 510), "FACTS",
+                       font=f_xl, fill=WHITE, outline=(0, 0, 0),
+                       outline_width=4, anchor="mm")
 
-    draw.ellipse([(120, 200), (480, 560)], fill=accent, outline=(0,0,0), width=6)
-    draw_outlined_text(draw, (300, 350), "5",
-                       font=font_huge, fill=(51,51,51),       # on-primary #333333
-                       outline=(255,255,255), outline_width=3)
-    draw_outlined_text(draw, (300, 490), "FACTS",
-                       font=find_font(60, bold=True), fill=(51,51,51),  # on-primary #333333
-                       outline=(255,255,255), outline_width=2)
+    # Amber divider line
+    draw.line([(510, 50), (510, 670)], fill=AMBER, width=2)
 
-    draw_outlined_text(draw, (620, 220), "ABOUT",
-                       font=font_xl, fill=(255,255,255), outline_width=4, anchor="lm")
-    draw_outlined_text(draw, (620, 340), fruit_name.upper(),
-                       font=font_huge, fill=accent, outline=(0,0,0),
+    # Right: channel eyebrow + topic name + subtitle
+    draw_outlined_text(draw, (660, 110), "GUITAR WITH FACTS",
+                       font=f_medium, fill=SMOKE, outline=(0, 0, 0),
+                       outline_width=2, anchor="lm")
+
+    topic_disp = fruit_name.upper()
+    topic_size = max(65, int(95 * min(1.0, 10 / max(len(topic_disp), 1))))
+    draw_outlined_text(draw, (660, 290), topic_disp,
+                       font=get_display_font(topic_size), fill=AMBER,
+                       outline=(0, 0, 0), outline_width=5, anchor="lm")
+
+    draw_outlined_text(draw, (660, 440), "5  WILD  FACTS",
+                       font=f_xl, fill=WHITE, outline=(0, 0, 0),
                        outline_width=4, anchor="lm")
-    draw_outlined_text(draw, (620, 490), "YOU MUST KNOW!",
-                       font=find_font(55, bold=True), fill=(255,255,255),
-                       outline_width=3, anchor="lm")
 
-    draw.rectangle([(0, 660), (W, H)], fill=primary)
-    draw_outlined_text(draw, (W//2, 690), "#Shorts #GuitarFacts",
-                       font=font_medium, fill=(255,255,255), outline_width=2)
+    # Electric underline accent
+    draw.line([(660, 500), (900, 502)], fill=ELECTRIC, width=3)
+
+    draw.text((640, 670), "#Shorts  •  #GuitarFacts",
+              font=f_small, fill=SMOKE, anchor="mm")
 
     img.save(output_path, "JPEG", quality=95)
     print(f"Horizontal thumbnail saved: {output_path}")
