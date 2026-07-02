@@ -284,10 +284,33 @@ def create_animated_clip(card_image_path, duration, output_path, anim_type="zoom
         ], capture_output=True, timeout=120)
 
 
-# ── Card creation functions (unchanged) ──────────────────────────────────────
+# ── Card creation functions ───────────────────────────────────────────────────
+def draw_fact_bubble(card, draw, cx, cy, headline, subtext, amber):
+    """Canva-style white speech-bubble badge with a music-note icon, used to
+    stamp a fact number over the photo background."""
+    WHITE = (255, 255, 255)
+    GRAY  = (90, 90, 90)
+    bw, bh = 760, 420
+    bx0, by0 = cx - bw // 2, cy - bh // 2
+    bx1, by1 = bx0 + bw, by0 + bh
+
+    draw.rounded_rectangle([(bx0, by0), (bx1, by1)], radius=70, fill=WHITE)
+    tail_w, tail_h = 70, 55
+    draw.polygon([(cx - tail_w // 2, by1 - 5), (cx + tail_w // 2, by1 - 5),
+                  (cx, by1 + tail_h)], fill=WHITE)
+
+    icon_r, icon_cy = 70, by0 + 120
+    draw.ellipse([(cx - icon_r, icon_cy - icon_r), (cx + icon_r, icon_cy + icon_r)],
+                 outline=amber, width=6)
+    draw.text((cx, icon_cy), "♪", font=get_display_font(90), fill=amber, anchor="mm")
+
+    draw.text((cx, by0 + 250), headline, font=get_display_font(90), fill=amber, anchor="mm")
+    draw.text((cx, by0 + 330), subtext, font=get_body_font(40), fill=GRAY, anchor="mm")
+
+
 def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
                      emoji, colors, bg_image_path, output_path):
-    """Minimal fact card — photo with top/bottom dark strips, badge, and progress dots.
+    """Photo background with dark strips, a Canva-style fact bubble, and progress dots.
     Subtitles handle the actual fact text."""
     try:
         primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
@@ -316,18 +339,14 @@ def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
     card = card.convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    f_badge = get_body_font(38, bold=True)
-    f_chan  = get_body_font(30)
-
-    # Cyan "FACT N/5" pill — top left
-    bw, bh = 220, 68
-    draw.rounded_rectangle([(28, 28), (28 + bw, 28 + bh)], radius=34, fill=ELECTRIC)
-    draw.text((28 + bw // 2, 28 + bh // 2), f"FACT {fact_num}/{total_facts}",
-              font=f_badge, fill=DARK, anchor="mm")
+    f_chan = get_body_font(30)
 
     # Channel name — top right
     draw.text((W - 28, 62), "Guitar with Facts",
               font=f_chan, fill=WHITE, anchor="rm")
+
+    # Canva-style fact bubble — centered
+    draw_fact_bubble(card, draw, W // 2, 640, f"FACT {fact_num}", f"{fact_num} of {total_facts}", AMBER)
 
     # Progress dots — bottom right, above subtitle zone
     dot_y   = H - 140
@@ -345,7 +364,7 @@ def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
 
 
 def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output_path):
-    """Hook card — photo with dark strips, amber INTRO badge, string lines."""
+    """Hook card — photo with dark strips, Canva-style intro bubble, string lines."""
     try:
         primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
     except Exception:
@@ -371,19 +390,15 @@ def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output
     card = card.convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    f_badge = get_body_font(38, bold=True)
-    f_chan  = get_body_font(30)
-    f_cta   = get_body_font(36)
-
-    # Amber "INTRO" pill — top left
-    bw, bh = 180, 68
-    draw.rounded_rectangle([(28, 28), (28 + bw, 28 + bh)], radius=34, fill=AMBER)
-    draw.text((28 + bw // 2, 28 + bh // 2), "INTRO",
-              font=f_badge, fill=DARK, anchor="mm")
+    f_chan = get_body_font(30)
+    f_cta  = get_body_font(36)
 
     # Channel name — top right
     draw.text((W - 28, 62), "Guitar with Facts",
               font=f_chan, fill=WHITE, anchor="rm")
+
+    # Canva-style intro bubble — centered
+    draw_fact_bubble(card, draw, W // 2, 640, "GUITAR FACTS", "5 facts inside", AMBER)
 
     # Bottom CTA
     draw.text((W // 2, H - 140), "Watch till the end!",
