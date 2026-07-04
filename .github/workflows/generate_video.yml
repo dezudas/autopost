@@ -62,7 +62,9 @@ jobs:
       - name: Save progress
         run: |
           git config --global user.name "Guitar Bot"
-          git config --global user.email "bot@guitarbot.com"
+          git config --global user.email "${{ secrets.EMAIL_ADDRESS }}"
           git add done.txt
           git diff --staged --quiet || git commit -m "Auto: marked topic as done"
           git push
+
+

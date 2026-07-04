@@ -5,6 +5,7 @@ Uses scale animations instead of slow zoompan filter
 """
 
 import json
+import math
 import os
 import subprocess
 import requests
@@ -14,19 +15,32 @@ from PIL import Image, ImageDraw, ImageFont
 W, H = 1080, 1920
 FPS = 24
 
+# ── Canva "Fun Fact" reference palette ────────────────────────────────────────
+PEACH      = (255, 224, 199)   # card background
+PEACH_BLOB = (255, 213, 177)   # organic blobs on peach
+MINT       = (162, 229, 211)   # outro background
+MINT_BLOB  = (145, 208, 192)
+ACCENT     = (207, 64, 26)     # orange-red heading/body
+CHARCOAL   = (60, 60, 80)
+PERIWINKLE = (126, 134, 210)
+WHITE      = (255, 255, 255)
 
-# ── Font utilities (Bebas Neue display + Poppins body) ────────────────────────
-_BEBAS_PATH = None
+
+# ── Font utilities (Baloo 2 display + Varela Round body, per Canva ref) ──────
+FONT_URLS = {
+    "output/fonts/Baloo2.ttf":
+        "https://github.com/google/fonts/raw/main/ofl/baloo2/Baloo2%5Bwght%5D.ttf",
+    "output/fonts/VarelaRound.ttf":
+        "https://github.com/google/fonts/raw/main/ofl/varelaround/VarelaRound-Regular.ttf",
+}
 
 
-def _download_bebas():
-    path = "output/fonts/BebasNeue-Regular.ttf"
+def _font_path(path):
     if os.path.exists(path):
         return path
     os.makedirs("output/fonts", exist_ok=True)
-    url = "https://github.com/google/fonts/raw/main/ofl/bebasnew/BebasNeue-Regular.ttf"
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(FONT_URLS[path], timeout=15)
         if r.status_code == 200 and len(r.content) > 10000:
             with open(path, "wb") as f:
                 f.write(r.content)
@@ -37,59 +51,80 @@ def _download_bebas():
 
 
 def get_display_font(size):
-    global _BEBAS_PATH
-    if _BEBAS_PATH is None:
-        _BEBAS_PATH = _download_bebas() or ""
-    candidates = ([_BEBAS_PATH] if _BEBAS_PATH else []) + [
-        "/usr/share/fonts/truetype/poppins/Poppins-Bold.ttf",
-        "/usr/share/fonts/truetype/manrope/Manrope-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    ]
-    for p in candidates:
-        if p and os.path.exists(p):
-            try:
-                return ImageFont.truetype(p, size)
-            except Exception:
-                continue
-    return ImageFont.load_default()
+    """Baloo 2 Bold — chunky rounded display, matches the Canva heading."""
+    p = _font_path("output/fonts/Baloo2.ttf")
+    if p:
+        try:
+            f = ImageFont.truetype(p, size)
+            f.set_variation_by_axes([700])
+            return f
+        except Exception:
+            pass
+    fb = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    return ImageFont.truetype(fb, size) if os.path.exists(fb) else ImageFont.load_default()
 
 
 def get_body_font(size, bold=False):
-    w = "Bold" if bold else "Regular"
-    candidates = [
-        f"/usr/share/fonts/truetype/poppins/Poppins-{w}.ttf",
-        f"/usr/share/fonts/truetype/manrope/Manrope-{w}.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSans-Bold.ttf" if bold
-            else "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold
-            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    for p in candidates:
-        if os.path.exists(p):
-            try:
-                return ImageFont.truetype(p, size)
-            except Exception:
-                continue
-    return ImageFont.load_default()
+    """Varela Round — friendly rounded body, matches the Canva body text."""
+    p = _font_path("output/fonts/VarelaRound.ttf")
+    if p:
+        try:
+            return ImageFont.truetype(p, size)
+        except Exception:
+            pass
+    fb = f"/usr/share/fonts/truetype/dejavu/DejaVuSans{'-Bold' if bold else ''}.ttf"
+    return ImageFont.truetype(fb, size) if os.path.exists(fb) else ImageFont.load_default()
 
 
-def draw_strings(base_rgba, y_center, n=6, spacing=13, opacity=55, color=(255, 193, 7)):
-    """Overlay n horizontal guitar-string lines centered at y_center."""
-    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    d = ImageDraw.Draw(ov)
-    for i in range(n):
-        y = int(y_center + (i - n / 2 + 0.5) * spacing)
-        d.line([(0, y), (W, y)], fill=(*color, opacity), width=1)
-    return Image.alpha_composite(base_rgba, ov)
+# ── Canva-style drawing helpers ───────────────────────────────────────────────
+def blob_canvas(bg, blob):
+    """Solid background with soft organic corner blobs, per the Canva reference."""
+    img = Image.new("RGB", (W, H), bg)
+    d = ImageDraw.Draw(img)
+    for box in [(-380, -260, 420, 330), (720, -200, 1420, 320),
+                (-300, 1430, 360, 2120), (800, 1480, 1480, 2080)]:
+        d.ellipse(box, fill=blob)
+    return img
 
 
-def _outlined(draw, pos, text, font, fill, outline=(0, 0, 0), w=4):
-    x, y = pos
-    for dx in range(-w, w + 1):
-        for dy in range(-w, w + 1):
-            if dx * dx + dy * dy <= w * w:
-                draw.text((x + dx, y + dy), text, font=font, fill=outline, anchor="mm")
-    draw.text((x, y), text, font=font, fill=fill, anchor="mm")
+def draw_bubble(draw, x0, y0, x1, y1, radius=200, tail="speech"):
+    """Big white speech/thought bubble, per the Canva reference."""
+    draw.rounded_rectangle([(x0, y0), (x1, y1)], radius=radius, fill=WHITE)
+    if tail == "speech":
+        tx = x1 - 320
+        draw.polygon([(tx, y1 - 6), (tx + 150, y1 - 6), (tx + 125, y1 + 100)], fill=WHITE)
+    else:  # thought bubble
+        draw.ellipse([(x1 - 300, y1 - 20), (x1 - 215, y1 + 65)], fill=WHITE)
+        draw.ellipse([(x1 - 190, y1 + 85), (x1 - 135, y1 + 140)], fill=WHITE)
+
+
+def draw_bulb(draw, cx, cy, r=75, color=ACCENT):
+    """Hand-drawn lightbulb doodle, per the Canva reference."""
+    draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], outline=color, width=9)
+    draw.line([(cx - 34, cy + 22), (cx - 17, cy - 12), (cx, cy + 22),
+               (cx + 17, cy - 12), (cx + 34, cy + 22)],
+              fill=color, width=7, joint="curve")
+    draw.rounded_rectangle([(cx - 30, cy + r + 10), (cx + 30, cy + r + 50)],
+                           radius=12, fill=color)
+    for ang in range(-170, -9, 20):   # rays over the top half
+        a = math.radians(ang)
+        draw.line([(cx + (r + 20) * math.cos(a), cy + (r + 20) * math.sin(a)),
+                   (cx + (r + 48) * math.cos(a), cy + (r + 48) * math.sin(a))],
+                  fill=color, width=8)
+
+
+def wrap_text(draw, text, font, max_w):
+    words, lines, cur = text.split(), [], ""
+    for w0 in words:
+        t = (cur + " " + w0).strip()
+        if draw.textlength(t, font=font) <= max_w:
+            cur = t
+        else:
+            lines.append(cur)
+            cur = w0
+    if cur:
+        lines.append(cur)
+    return lines
 
 
 def load_video_data():
@@ -284,174 +319,67 @@ def create_animated_clip(card_image_path, duration, output_path, anim_type="zoom
         ], capture_output=True, timeout=120)
 
 
-# ── Card creation functions ───────────────────────────────────────────────────
-def draw_fact_bubble(card, draw, cx, cy, headline, subtext, amber):
-    """Canva-style white speech-bubble badge with a music-note icon, used to
-    stamp a fact number over the photo background."""
-    WHITE = (255, 255, 255)
-    GRAY  = (90, 90, 90)
-    bw, bh = 760, 420
-    bx0, by0 = cx - bw // 2, cy - bh // 2
-    bx1, by1 = bx0 + bw, by0 + bh
-
-    draw.rounded_rectangle([(bx0, by0), (bx1, by1)], radius=70, fill=WHITE)
-    tail_w, tail_h = 70, 55
-    draw.polygon([(cx - tail_w // 2, by1 - 5), (cx + tail_w // 2, by1 - 5),
-                  (cx, by1 + tail_h)], fill=WHITE)
-
-    icon_r, icon_cy = 70, by0 + 120
-    draw.ellipse([(cx - icon_r, icon_cy - icon_r), (cx + icon_r, icon_cy + icon_r)],
-                 outline=amber, width=6)
-    draw.text((cx, icon_cy), "♪", font=get_display_font(90), fill=amber, anchor="mm")
-
-    draw.text((cx, by0 + 250), headline, font=get_display_font(90), fill=amber, anchor="mm")
-    draw.text((cx, by0 + 330), subtext, font=get_body_font(40), fill=GRAY, anchor="mm")
-
-
+# ── Card creation functions (Canva "Fun Fact" reference) ─────────────────────
 def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
                      emoji, colors, bg_image_path, output_path):
-    """Photo background with dark strips, a Canva-style fact bubble, and progress dots.
-    Subtitles handle the actual fact text."""
+    """Full-bleed photo with a soft dark overlay and a letterspaced FUN FACT
+    label, per the Canva reference. Subtitles carry the fact text."""
     try:
-        primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
+        bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS).convert("RGB")
     except Exception:
-        primary = (255, 193, 7)
+        bg = Image.new("RGB", (W, H), CHARCOAL)
 
-    AMBER    = primary
-    ELECTRIC = (0, 229, 255)
-    WHITE    = (255, 255, 255)
-    SMOKE    = (155, 155, 155)
-    DARK     = (18, 16, 8)
-
-    try:
-        bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS)
-    except Exception:
-        bg = Image.new("RGB", (W, H), DARK)
-
-    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ov = Image.new("RGBA", (W, H), (0, 0, 0, 70))
     od = ImageDraw.Draw(ov)
-    od.rectangle([(0, 0),       (W, 190)],  fill=(0, 0, 0, 155))
-    od.rectangle([(0, H - 220), (W, H)],    fill=(0, 0, 0, 165))
-
-    card = Image.alpha_composite(bg.convert("RGBA"), ov)
-    card = draw_strings(card, y_center=55,      n=6, opacity=50, color=AMBER)
-    card = draw_strings(card, y_center=H - 110, n=6, opacity=45, color=AMBER)
-    card = card.convert("RGB")
+    for i in range(500):   # darker toward the bottom so captions stay readable
+        od.line([(0, H - 500 + i), (W, H - 500 + i)],
+                fill=(0, 0, 0, 70 + int(i * 110 / 500)))
+    card = Image.alpha_composite(bg.convert("RGBA"), ov).convert("RGB")
     draw = ImageDraw.Draw(card)
 
-    f_chan = get_body_font(30)
-
-    # Channel name — top right
-    draw.text((W - 28, 62), "Guitar with Facts",
-              font=f_chan, fill=WHITE, anchor="rm")
-
-    # Canva-style fact bubble — centered
-    draw_fact_bubble(card, draw, W // 2, 640, f"FACT {fact_num}", f"{fact_num} of {total_facts}", AMBER)
-
-    # Progress dots — bottom right, above subtitle zone
-    dot_y   = H - 140
-    dot_gap = 42
-    total_w = (total_facts - 1) * dot_gap
-    sx = W - 50 - total_w
-    for i in range(total_facts):
-        cx = sx + i * dot_gap
-        if i + 1 == fact_num:
-            draw.ellipse([(cx - 12, dot_y - 12), (cx + 12, dot_y + 12)], fill=ELECTRIC)
-        else:
-            draw.ellipse([(cx - 7,  dot_y - 7),  (cx + 7,  dot_y + 7)],  fill=SMOKE)
+    label = " ".join(f"FUN FACT {fact_num} OF {total_facts}")
+    draw.text((W // 2 + 3, 173), label, font=get_body_font(38), fill=(0, 0, 0), anchor="mm")
+    draw.text((W // 2, 170), label, font=get_body_font(38), fill=WHITE, anchor="mm")
+    draw.text((W // 2, 245), "@guitarwithfacts",
+              font=get_body_font(30), fill=(235, 235, 235), anchor="mm")
 
     card.save(output_path, "PNG", optimize=False)
 
 
 def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output_path):
-    """Hook card — photo with dark strips, Canva-style intro bubble, string lines."""
-    try:
-        primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
-    except Exception:
-        primary = (255, 193, 7)
-
-    AMBER = primary
-    WHITE = (255, 255, 255)
-    DARK  = (18, 16, 8)
-
-    try:
-        bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS)
-    except Exception:
-        bg = Image.new("RGB", (W, H), DARK)
-
-    ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    od = ImageDraw.Draw(ov)
-    od.rectangle([(0, 0),       (W, 190)],  fill=(0, 0, 0, 155))
-    od.rectangle([(0, H - 220), (W, H)],    fill=(0, 0, 0, 165))
-
-    card = Image.alpha_composite(bg.convert("RGBA"), ov)
-    card = draw_strings(card, y_center=55,      n=6, opacity=50, color=AMBER)
-    card = draw_strings(card, y_center=H - 110, n=6, opacity=45, color=AMBER)
-    card = card.convert("RGB")
+    """Peach FUN FACT speech-bubble card with lightbulb doodle, per the Canva reference."""
+    card = blob_canvas(PEACH, PEACH_BLOB)
     draw = ImageDraw.Draw(card)
 
-    f_chan = get_body_font(30)
-    f_cta  = get_body_font(36)
+    draw_bubble(draw, 70, 420, W - 70, 1480, tail="speech")
+    draw_bulb(draw, W // 2, 620)
+    draw.text((W // 2, 850), "FUN FACT", font=get_display_font(125), fill=ACCENT, anchor="mm")
 
-    # Channel name — top right
-    draw.text((W - 28, 62), "Guitar with Facts",
-              font=f_chan, fill=WHITE, anchor="rm")
+    f_body = get_body_font(52)
+    for i, ln in enumerate(wrap_text(draw, hook_text, f_body, 720)[:6]):
+        draw.text((W // 2, 990 + i * 78), ln, font=f_body, fill=ACCENT, anchor="mm")
 
-    # Canva-style intro bubble — centered
-    draw_fact_bubble(card, draw, W // 2, 640, "GUITAR FACTS", "5 facts inside", AMBER)
-
-    # Bottom CTA
-    draw.text((W // 2, H - 140), "Watch till the end!",
-              font=f_cta, fill=WHITE, anchor="mm")
-
+    draw.text((W // 2, H - 60), "Guitar with Facts",
+              font=get_body_font(36), fill=ACCENT, anchor="mm")
     card.save(output_path, "PNG", optimize=False)
 
 
 def create_outro_card(fruit_name, emoji, colors, output_path):
-    """Dark-stage outro: near-black background, electric cyan WATCHING splash, amber brand."""
-    try:
-        primary = tuple(int(colors.get("primary", "#FFC107").lstrip("#")[i:i+2], 16) for i in (0,2,4))
-    except Exception:
-        primary = (255, 193, 7)
+    """Mint thought-bubble outro card, per the Canva reference."""
+    card = blob_canvas(MINT, MINT_BLOB)
+    draw = ImageDraw.Draw(card)
 
-    AMBER    = primary
-    ELECTRIC = (0, 229, 255)
-    WHITE    = (255, 255, 255)
-    SMOKE    = (140, 140, 140)
-    BG       = (18, 15, 8)
+    draw_bubble(draw, 90, 500, W - 90, 1420, tail="thought")
+    draw.text((W // 2, 710), "THANKS FOR", font=get_display_font(95), fill=CHARCOAL, anchor="mm")
+    draw.text((W // 2, 855), "WATCHING!", font=get_display_font(140), fill=ACCENT, anchor="mm")
 
-    # Near-black warm background — subtle gradient
-    img = Image.new("RGB", (W, H), BG)
-    draw = ImageDraw.Draw(img)
-    for y in range(H):
-        r = max(0, BG[0] - int(10 * y / H))
-        g = max(0, BG[1] - int(9  * y / H))
-        b = max(0, BG[2] - int(6  * y / H))
-        draw.line([(0, y), (W, y)], fill=(r, g, b))
+    f_body = get_body_font(50)
+    for i, ln in enumerate(["Like & Subscribe", "for more guitar facts!"]):
+        draw.text((W // 2, 1060 + i * 80), ln, font=f_body, fill=PERIWINKLE, anchor="mm")
 
-    img_rgba = img.convert("RGBA")
-    img_rgba = draw_strings(img_rgba, y_center=280,  n=6, opacity=65, color=AMBER)
-    img_rgba = draw_strings(img_rgba, y_center=920,  n=6, opacity=45, color=WHITE)
-    img_rgba = draw_strings(img_rgba, y_center=1490, n=6, opacity=60, color=AMBER)
-    img = img_rgba.convert("RGB")
-    draw = ImageDraw.Draw(img)
-
-    f_big    = get_display_font(200)
-    f_huge   = get_display_font(130)
-    f_xl     = get_display_font(95)
-    f_medium = get_body_font(55, bold=True)
-    f_small  = get_body_font(36)
-
-    _outlined(draw, (W//2, 420),  "Thanks for",          f_xl,    SMOKE,    w=2)
-    _outlined(draw, (W//2, 625),  "WATCHING",             f_big,   ELECTRIC, w=6)
-    _outlined(draw, (W//2, 800),  "!",                    f_huge,  AMBER,    w=5)
-    _outlined(draw, (W//2, 1055), "LIKE  &  SUBSCRIBE",  f_xl,    AMBER,    w=4)
-    draw.text((W//2, 1190), "for more guitar facts!", font=f_medium, fill=WHITE, anchor="mm")
-    _outlined(draw, (W//2, 1615), "GUITAR",               f_big,   WHITE,    w=6)
-    _outlined(draw, (W//2, 1795), "with FACTS",           f_huge,  AMBER,    w=5)
-    draw.text((W//2, 1900), "#Shorts  •  #GuitarFacts", font=f_small, fill=SMOKE, anchor="mm")
-
-    img.save(output_path, "PNG", optimize=False)
+    draw.text((W // 2, H - 60), "Guitar with Facts",
+              font=get_body_font(36), fill=CHARCOAL, anchor="mm")
+    card.save(output_path, "PNG", optimize=False)
 
 
 def create_subtitles(data, thumbnail_offset=1.5):
@@ -611,15 +539,17 @@ def assemble_video(data, srt_path, music_path):
 
     # Then add audio + subtitles in single pass
     srt_esc = srt_path.replace("\\", "/").replace(":", "\\:")
+    fonts_dir = os.path.abspath("output/fonts").replace("\\", "/").replace(":", "\\:")
     sub_style = (
-        "FontName=Arial,FontSize=18,Bold=1,"
-        "PrimaryColour=&H00FFE500,"        # Electric cyan (#00E5FF in ASS BGR)
-        "OutlineColour=&H00000000,"        # Black outline
-        "BackColour=&H00000000,"           # Transparent
+        "FontName=Varela Round,FontSize=17,Bold=0,"
+        "PrimaryColour=&H00FFFFFF,"        # white, per Canva caption style
+        "OutlineColour=&H60000000,"        # soft dark outline
+        "BackColour=&H80000000,"           # soft shadow
         "BorderStyle=1,"
-        "Outline=4,Shadow=2,"
+        "Outline=1,Shadow=2,"
+        "Spacing=3,"                       # letterspaced captions
         "Alignment=2,"                     # Bottom center
-        "MarginV=60,"
+        "MarginV=140,"
         "MarginL=80,MarginR=80"
     )
 
@@ -639,7 +569,7 @@ def assemble_video(data, srt_path, music_path):
         "-i", voiceover_mp3,
         "-i", music_path,
         "-filter_complex",
-        f"[0:v]subtitles='{srt_esc}':force_style='{sub_style}'[vout];"
+        f"[0:v]subtitles='{srt_esc}':fontsdir='{fonts_dir}':force_style='{sub_style}'[vout];"
         f"[1:a]{audio_filter}[clean_voice];"
         # Mix cleaned voice with subtle music (music at 12% volume)
         f"[clean_voice][2:a]amix=inputs=2:weights='1.0 0.12':"
