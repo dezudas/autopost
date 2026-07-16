@@ -97,15 +97,34 @@ def upload_video(token, title, description, tags):
         while uploaded < size:
             chunk = f.read(chunk_size)
             end   = uploaded + len(chunk) - 1
-            r = requests.put(
-                upload_url,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type":  "video/mp4",
-                    "Content-Range": f"bytes {uploaded}-{end}/{size}"
-                },
-                data=chunk
-            )
+
+            r = None
+            backoffs = [2, 5, 10]
+            for attempt, wait in enumerate([0] + backoffs):
+                if wait:
+                    print(f"\n  Chunk retry in {wait}s...", end="", flush=True)
+                    time.sleep(wait)
+                try:
+                    r = requests.put(
+                        upload_url,
+                        headers={
+                            "Authorization": f"Bearer {token}",
+                            "Content-Type":  "video/mp4",
+                            "Content-Range": f"bytes {uploaded}-{end}/{size}"
+                        },
+                        data=chunk,
+                        timeout=120
+                    )
+                except requests.exceptions.RequestException as e:
+                    print(f"\n  Chunk network error: {e}")
+                    r = None
+                    continue
+                if r.status_code in [200, 201, 308] or r.status_code < 500:
+                    break
+
+            if r is None:
+                raise Exception("Chunk failed: no response after retries (network error)")
+
             if r.status_code in [200, 201]:
                 video_id = r.json().get("id")
                 print(f"\nUploaded! Video ID: {video_id}")

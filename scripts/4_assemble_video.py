@@ -9,6 +9,7 @@ import math
 import os
 import subprocess
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -26,52 +27,24 @@ PERIWINKLE = (126, 134, 210)
 WHITE      = (255, 255, 255)
 
 
-# ── Font utilities (Baloo 2 display + Varela Round body, per Canva ref) ──────
-FONT_URLS = {
-    "output/fonts/Baloo2.ttf":
-        "https://github.com/google/fonts/raw/main/ofl/baloo2/Baloo2%5Bwght%5D.ttf",
-    "output/fonts/VarelaRound.ttf":
-        "https://github.com/google/fonts/raw/main/ofl/varelaround/VarelaRound-Regular.ttf",
-}
-
-
-def _font_path(path):
-    if os.path.exists(path):
-        return path
-    os.makedirs("output/fonts", exist_ok=True)
-    try:
-        r = requests.get(FONT_URLS[path], timeout=15)
-        if r.status_code == 200 and len(r.content) > 10000:
-            with open(path, "wb") as f:
-                f.write(r.content)
-            return path
-    except Exception:
-        pass
-    return None
+# ── Font utilities (Montserrat display + Inter body, vendored in assets/fonts) ──
+FONTS_DIR = "assets/fonts"
 
 
 def get_display_font(size):
-    """Baloo 2 Bold — chunky rounded display, matches the Canva heading."""
-    p = _font_path("output/fonts/Baloo2.ttf")
-    if p:
-        try:
-            f = ImageFont.truetype(p, size)
-            f.set_variation_by_axes([700])
-            return f
-        except Exception:
-            pass
+    """Montserrat Black — bold sans-serif display font."""
+    p = os.path.join(FONTS_DIR, "Montserrat-Black.ttf")
+    if os.path.exists(p):
+        return ImageFont.truetype(p, size)
     fb = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     return ImageFont.truetype(fb, size) if os.path.exists(fb) else ImageFont.load_default()
 
 
 def get_body_font(size, bold=False):
-    """Varela Round — friendly rounded body, matches the Canva body text."""
-    p = _font_path("output/fonts/VarelaRound.ttf")
-    if p:
-        try:
-            return ImageFont.truetype(p, size)
-        except Exception:
-            pass
+    """Inter Regular/Medium — clean sans-serif body font."""
+    p = os.path.join(FONTS_DIR, "Inter_18pt-Medium.ttf" if bold else "Inter_18pt-Regular.ttf")
+    if os.path.exists(p):
+        return ImageFont.truetype(p, size)
     fb = f"/usr/share/fonts/truetype/dejavu/DejaVuSans{'-Bold' if bold else ''}.ttf"
     return ImageFont.truetype(fb, size) if os.path.exists(fb) else ImageFont.load_default()
 
@@ -254,9 +227,6 @@ def create_animated_clip(card_image_path, duration, output_path, anim_type="zoom
     """
     total_frames = int(duration * FPS)
 
-    # Pre-resize the image to a larger size for cropping
-    img = Image.open(card_image_path)
-
     if anim_type == "zoom_in":
         # Slowly zoom from 100% to 110% (cropping inward)
         crop_filter = (
@@ -329,11 +299,16 @@ def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
     except Exception:
         bg = Image.new("RGB", (W, H), CHARCOAL)
 
+    # Darker toward the bottom so captions stay readable — built with a single
+    # stretched gradient + LUT instead of 500 per-row draw calls.
     ov = Image.new("RGBA", (W, H), (0, 0, 0, 70))
-    od = ImageDraw.Draw(ov)
-    for i in range(500):   # darker toward the bottom so captions stay readable
-        od.line([(0, H - 500 + i), (W, H - 500 + i)],
-                fill=(0, 0, 0, 70 + int(i * 110 / 500)))
+    band_h = 500
+    grad = Image.linear_gradient("L").resize((W, band_h))
+    lut = [70 + v * 110 // 255 for v in range(256)]
+    alpha_band = grad.point(lut)
+    r, g, b, a = ov.split()
+    a.paste(alpha_band, (0, H - band_h))
+    ov = Image.merge("RGBA", (r, g, b, a))
     card = Image.alpha_composite(bg.convert("RGBA"), ov).convert("RGB")
     draw = ImageDraw.Draw(card)
 
@@ -503,17 +478,29 @@ def assemble_video(data, srt_path, music_path):
 
     print(f"Cards ready: {len(cards_data)}")
 
-    # ── PASS 1: Render each card as animated clip (fast, parallel-friendly) ──
-    print("\n=== Pass 1: Animating each clip ===")
-    clip_paths = []
-    for i, (card, dur, anim) in enumerate(cards_data):
+    # ── PASS 1: Render each card as animated clip (independent ffmpeg calls) ──
+    print("\n=== Pass 1: Animating each clip (parallel) ===")
+
+    def render_one(i, card, dur, anim):
         clip_path = f"output/clips/clip_{i}.mp4"
-        print(f"  Animating clip {i+1}/{len(cards_data)} ({anim}, {dur:.1f}s)...")
+        print(f"  [clip {i+1}/{len(cards_data)}] {anim}, {dur:.1f}s...")
         create_animated_clip(card, dur, clip_path, anim)
-        if os.path.exists(clip_path):
-            clip_paths.append(clip_path)
-        else:
-            print(f"  WARNING: clip {i} failed")
+        return i, clip_path if os.path.exists(clip_path) else None
+
+    rendered = {}
+    with ThreadPoolExecutor(max_workers=min(4, len(cards_data))) as executor:
+        futures = [
+            executor.submit(render_one, i, card, dur, anim)
+            for i, (card, dur, anim) in enumerate(cards_data)
+        ]
+        for future in as_completed(futures):
+            i, clip_path = future.result()
+            rendered[i] = clip_path
+            if clip_path is None:
+                print(f"  WARNING: clip {i} failed")
+
+    # Preserve original card order (thumbnail->hook->facts->outro) for the concat file
+    clip_paths = [rendered[i] for i in range(len(cards_data)) if rendered[i]]
 
     if not clip_paths:
         raise RuntimeError("No clips were created!")
@@ -539,9 +526,9 @@ def assemble_video(data, srt_path, music_path):
 
     # Then add audio + subtitles in single pass
     srt_esc = srt_path.replace("\\", "/").replace(":", "\\:")
-    fonts_dir = os.path.abspath("output/fonts").replace("\\", "/").replace(":", "\\:")
+    fonts_dir = os.path.abspath("assets/fonts").replace("\\", "/").replace(":", "\\:")
     sub_style = (
-        "FontName=Varela Round,FontSize=17,Bold=0,"
+        "FontName=Inter 18pt,FontSize=17,Bold=0,"
         "PrimaryColour=&H00FFFFFF,"        # white, per Canva caption style
         "OutlineColour=&H60000000,"        # soft dark outline
         "BackColour=&H80000000,"           # soft shadow

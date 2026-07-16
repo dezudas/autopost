@@ -18,6 +18,7 @@ import math
 import os
 import time
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 import io
 import urllib.parse
@@ -33,52 +34,24 @@ CHARCOAL   = (60, 60, 80)
 WHITE      = (255, 255, 255)
 
 
-# ── Font utilities (Baloo 2 display + Varela Round body, per Canva ref) ──────
-FONT_URLS = {
-    "output/fonts/Baloo2.ttf":
-        "https://github.com/google/fonts/raw/main/ofl/baloo2/Baloo2%5Bwght%5D.ttf",
-    "output/fonts/VarelaRound.ttf":
-        "https://github.com/google/fonts/raw/main/ofl/varelaround/VarelaRound-Regular.ttf",
-}
-
-
-def _font_path(path):
-    if os.path.exists(path):
-        return path
-    os.makedirs("output/fonts", exist_ok=True)
-    try:
-        r = requests.get(FONT_URLS[path], timeout=15)
-        if r.status_code == 200 and len(r.content) > 10000:
-            with open(path, "wb") as f:
-                f.write(r.content)
-            return path
-    except Exception as e:
-        print(f"  Font download failed: {e}")
-    return None
+# ── Font utilities (Montserrat display + Inter body, vendored in assets/fonts) ──
+FONTS_DIR = "assets/fonts"
 
 
 def get_display_font(size):
-    """Baloo 2 Bold — chunky rounded display, matches the Canva heading."""
-    p = _font_path("output/fonts/Baloo2.ttf")
-    if p:
-        try:
-            f = ImageFont.truetype(p, size)
-            f.set_variation_by_axes([700])
-            return f
-        except Exception:
-            pass
+    """Montserrat Black — bold sans-serif display font."""
+    p = os.path.join(FONTS_DIR, "Montserrat-Black.ttf")
+    if os.path.exists(p):
+        return ImageFont.truetype(p, size)
     fb = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     return ImageFont.truetype(fb, size) if os.path.exists(fb) else ImageFont.load_default()
 
 
 def get_body_font(size, bold=False):
-    """Varela Round — friendly rounded body, matches the Canva body text."""
-    p = _font_path("output/fonts/VarelaRound.ttf")
-    if p:
-        try:
-            return ImageFont.truetype(p, size)
-        except Exception:
-            pass
+    """Inter Regular/Medium — clean sans-serif body font."""
+    p = os.path.join(FONTS_DIR, "Inter_18pt-Medium.ttf" if bold else "Inter_18pt-Regular.ttf")
+    if os.path.exists(p):
+        return ImageFont.truetype(p, size)
     fb = f"/usr/share/fonts/truetype/dejavu/DejaVuSans{'-Bold' if bold else ''}.ttf"
     return ImageFont.truetype(fb, size) if os.path.exists(fb) else ImageFont.load_default()
 
@@ -138,7 +111,7 @@ def hex_to_rgb(hex_str, default=(255, 193, 7)):  # default: #FFC107 (design.md p
 
 
 # ── Search and download image from Unsplash ──────────────────────────────────
-def get_unsplash_image(query, output_path, access_key, orientation="portrait", index=0):
+def get_unsplash_image(query, output_path, access_key, orientation="portrait", index=0, tag=""):
     """
     Search Unsplash for high quality fruit photos.
     Downloads as 1080x1920 vertical (portrait) for Shorts.
@@ -159,23 +132,23 @@ def get_unsplash_image(query, output_path, access_key, orientation="portrait", i
         "content_filter": "high"      # only safe, high-quality images
     }
 
-    print(f"  Searching Unsplash: '{query}'...")
+    print(f"{tag}  Searching Unsplash: '{query}'...")
     r = requests.get(search_url, headers=headers, params=params, timeout=15)
-    print(f"  Search status: {r.status_code}")
+    print(f"{tag}  Search status: {r.status_code}")
 
     if r.status_code == 401:
-        print("  Invalid UNSPLASH_ACCESS_KEY — check GitHub Secret!")
+        print(f"{tag}  Invalid UNSPLASH_ACCESS_KEY — check GitHub Secret!")
         return False
     if r.status_code == 403:
-        print("  Rate limit reached (50/hour) — using fallback")
+        print(f"{tag}  Rate limit reached (50/hour) — using fallback")
         return False
     if r.status_code != 200:
-        print(f"  Search error: {r.text[:200]}")
+        print(f"{tag}  Search error: {r.text[:200]}")
         return False
 
     results = r.json().get("results", [])
     if not results:
-        print(f"  No results for '{query}' — trying broader search")
+        print(f"{tag}  No results for '{query}' — trying broader search")
         return False
 
     # Pick different image for each scene (cycle through results)
@@ -184,7 +157,7 @@ def get_unsplash_image(query, output_path, access_key, orientation="portrait", i
     photo_url  = photo["urls"]["regular"]  # 1080px wide
     photo_user = photo["user"]["name"]
 
-    print(f"  Found: {photo_id} by {photo_user}")
+    print(f"{tag}  Found: {photo_id} by {photo_user}")
 
     # Download the actual image
     # 1.2x oversize so step 4's zoom/pan has real pixels to crop into
@@ -192,14 +165,14 @@ def get_unsplash_image(query, output_path, access_key, orientation="portrait", i
 
     img_resp = requests.get(download_url, timeout=30)
     if img_resp.status_code != 200 or len(img_resp.content) < 5000:
-        print(f"  Download failed: {img_resp.status_code}")
+        print(f"{tag}  Download failed: {img_resp.status_code}")
         return False
 
     img = Image.open(io.BytesIO(img_resp.content)).convert("RGB")
     img = warm_grade(img.resize((1296, 2304), Image.LANCZOS))
-    img.save(output_path, "PNG", quality=95)
+    img.save(output_path, "PNG")
 
-    print(f"  Saved: {output_path} ({os.path.getsize(output_path)//1024}KB) — Photo by {photo_user}")
+    print(f"{tag}  Saved: {output_path} ({os.path.getsize(output_path)//1024}KB) — Photo by {photo_user}")
 
     # Return attribution info
     return {
@@ -210,7 +183,7 @@ def get_unsplash_image(query, output_path, access_key, orientation="portrait", i
 
 
 # ── Fallback: Pollinations AI image ──────────────────────────────────────────
-def get_pollinations_image(prompt, output_path, index):
+def get_pollinations_image(prompt, output_path, index, tag=""):
     """Fallback if Unsplash fails"""
     import urllib.parse
     enhanced = (f"{prompt}, warm golden hour light, soft cozy mood, "
@@ -228,22 +201,22 @@ def get_pollinations_image(prompt, output_path, index):
             if r.status_code == 200 and len(r.content) > 5000:
                 img = Image.open(io.BytesIO(r.content))
                 img = img.resize((1080, 1920), Image.LANCZOS)
-                img.save(output_path, "PNG", quality=95)
-                print(f"  Pollinations fallback saved: {output_path}")
+                img.save(output_path, "PNG")
+                print(f"{tag}  Pollinations fallback saved: {output_path}")
                 return True
         except Exception as e:
-            print(f"  Pollinations error: {e}")
+            print(f"{tag}  Pollinations error: {e}")
             time.sleep(10)
     return False
 
 
 # ── Create on-palette blob-card fallback ──────────────────────────────────────
-def create_fallback_image(output_path, index, width=1080, height=1920):
+def create_fallback_image(output_path, index, width=1080, height=1920, tag=""):
     """Peach/mint blob card, per the Canva reference, so worst case stays on brand."""
     palettes = [(PEACH, PEACH_BLOB), (MINT, MINT_BLOB)]
     bg, blob = palettes[index % len(palettes)]
     blob_canvas(width, height, bg, blob).save(output_path, "PNG")
-    print(f"  Blob-card fallback saved: {output_path}")
+    print(f"{tag}  Blob-card fallback saved: {output_path}")
     return True
 
 
@@ -277,7 +250,7 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
     draw.text((W // 2, H - 60), "Guitar with Facts",
               font=get_body_font(36), fill=ACCENT, anchor="mm")
 
-    img.save(output_path, "PNG", quality=95)
+    img.save(output_path, "PNG")
     print(f"Vertical thumbnail saved: {output_path}")
 
 
@@ -335,9 +308,6 @@ if __name__ == "__main__":
         f"guitar warm morning light {topic}",
     ]
 
-    image_paths  = []
-    attributions = []
-
     print(f"=== Generating images for: {topic} ===")
 
     if access_key:
@@ -346,30 +316,41 @@ if __name__ == "__main__":
         print(f"UNSPLASH_ACCESS_KEY not set — using Pollinations fallback")
         print(f"Add UNSPLASH_ACCESS_KEY to GitHub Secrets for better images!")
 
-    for i, query in enumerate(search_queries):
+    def fetch_one(i, query):
+        tag = f"[img {i+1}]"
         out = f"output/images/scene_{i+1}.png"
-        print(f"\nImage {i+1}/5:")
         success = False
+        attribution = None
 
         # Try Unsplash first
         if access_key:
-            result = get_unsplash_image(query, out, access_key, index=i)
+            result = get_unsplash_image(query, out, access_key, index=i, tag=tag)
             if result:
-                attributions.append(result)
+                attribution = result
                 success = True
             else:
-                print(f"  Unsplash failed, trying Pollinations...")
+                print(f"{tag}  Unsplash failed, trying Pollinations...")
 
         # Fallback to Pollinations
         if not success:
-            success = get_pollinations_image(query, out, i)
+            success = get_pollinations_image(query, out, i, tag=tag)
 
         # Final fallback
         if not success or not os.path.exists(out) or os.path.getsize(out) < 5000:
-            create_fallback_image(out, i)
+            create_fallback_image(out, i, tag=tag)
 
-        image_paths.append(out)
-        time.sleep(1)   # Respect rate limits
+        return i, out, attribution
+
+    # 5 independent fetches — nowhere near Unsplash's 50 req/hour limit in parallel
+    results = {}
+    with ThreadPoolExecutor(max_workers=len(search_queries)) as executor:
+        futures = [executor.submit(fetch_one, i, q) for i, q in enumerate(search_queries)]
+        for future in as_completed(futures):
+            i, out, attribution = future.result()
+            results[i] = (out, attribution)
+
+    image_paths  = [results[i][0] for i in range(len(search_queries))]
+    attributions = [results[i][1] for i in range(len(search_queries)) if results[i][1]]
 
     # Save attribution info for description
     if attributions:

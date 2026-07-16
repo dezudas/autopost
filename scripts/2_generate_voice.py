@@ -10,6 +10,7 @@ import os
 import subprocess
 import time
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def load_video_data():
@@ -50,13 +51,13 @@ KOKORO_VOICES = {
 }
 
 
-def huggingface_tts(text, output_path, voice="af_bella", api_key=None):
+def huggingface_tts(text, output_path, voice="af_bella", api_key=None, tag=""):
     """
     Use Hugging Face Inference API with Kokoro-82M model.
     Tries the newer router endpoint first, falls back to legacy endpoint.
     """
     if not api_key:
-        print(f"  No HF_API_KEY set, skipping Hugging Face")
+        print(f"{tag}  No HF_API_KEY set, skipping Hugging Face")
         return False
 
     API_URLS = [
@@ -76,12 +77,12 @@ def huggingface_tts(text, output_path, voice="af_bella", api_key=None):
     }
 
     for api_url in API_URLS:
-        print(f"    Trying: {api_url}")
+        print(f"{tag}    Trying: {api_url}")
         for attempt in range(3):
             try:
-                print(f"    HF attempt {attempt+1}/3 (voice={voice})")
+                print(f"{tag}    HF attempt {attempt+1}/3 (voice={voice})")
                 r = requests.post(api_url, headers=headers, json=payload, timeout=120)
-                print(f"    Status: {r.status_code}, Size: {len(r.content)} bytes")
+                print(f"{tag}    Status: {r.status_code}, Size: {len(r.content)} bytes")
 
                 if r.status_code == 200 and len(r.content) > 1000:
                     if r.content[:4] in [b'RIFF', b'OggS', b'\xff\xfb', b'\xff\xf3', b'ID3\x04']:
@@ -91,35 +92,35 @@ def huggingface_tts(text, output_path, voice="af_bella", api_key=None):
                     else:
                         try:
                             err = r.json()
-                            print(f"    HF response: {err}")
+                            print(f"{tag}    HF response: {err}")
                         except:
                             with open(output_path, "wb") as f:
                                 f.write(r.content)
                             return True
 
                 elif r.status_code == 503:
-                    print(f"    Model loading, waiting 20s...")
+                    print(f"{tag}    Model loading, waiting 20s...")
                     time.sleep(20)
                 else:
                     try:
                         err = r.json()
-                        print(f"    HF error: {err}")
+                        print(f"{tag}    HF error: {err}")
                     except:
-                        print(f"    HF error: {r.text[:300]}")
+                        print(f"{tag}    HF error: {r.text[:300]}")
                     break  # non-retriable error, try next URL
 
             except requests.exceptions.ConnectionError as e:
                 # DNS failure or unreachable — no point retrying same URL
-                print(f"    Connection failed (DNS/network): {e}")
+                print(f"{tag}    Connection failed (DNS/network): {e}")
                 break
             except Exception as e:
-                print(f"    Exception: {e}")
+                print(f"{tag}    Exception: {e}")
                 time.sleep(5)
 
     return False
 
 
-def gtts_fallback(text, output_path, lang="en", tld="com"):
+def gtts_fallback(text, output_path, lang="en", tld="com", tag=""):
     try:
         from gtts import gTTS
         if lang == "en":
@@ -129,7 +130,7 @@ def gtts_fallback(text, output_path, lang="en", tld="com"):
         tts.save(output_path)
         return os.path.exists(output_path) and os.path.getsize(output_path) > 1000
     except Exception as e:
-        print(f"  gTTS error: {e}")
+        print(f"{tag}  gTTS error: {e}")
         return False
 
 
@@ -152,25 +153,26 @@ def espeak_fallback(text, output_path):
     return False
 
 
-def generate_segment(text, output_path, voice="af_bella", lang="en", hf_key=None):
+def generate_segment(name, text, output_path, voice="af_bella", lang="en", hf_key=None):
     """Try Hugging Face Kokoro first, fall back to gTTS, then espeak."""
+    tag = f"[{name}]"
     if lang == "en" and hf_key:
-        print(f"  Trying Hugging Face Kokoro ({voice})...")
-        if huggingface_tts(text, output_path, voice, hf_key):
-            print(f"  SUCCESS (HuggingFace {voice})")
-            return f"hf_{voice}"
+        print(f"{tag}  Trying Hugging Face Kokoro ({voice})...")
+        if huggingface_tts(text, output_path, voice, hf_key, tag=tag):
+            print(f"{tag}  SUCCESS (HuggingFace {voice})")
+            return name, "hf_" + voice, output_path
 
     # gTTS fallback
-    print(f"  Trying gTTS...")
-    if gtts_fallback(text, output_path, lang=lang):
-        print(f"  SUCCESS (gTTS)")
-        return "gtts"
+    print(f"{tag}  Trying gTTS...")
+    if gtts_fallback(text, output_path, lang=lang, tag=tag):
+        print(f"{tag}  SUCCESS (gTTS)")
+        return name, "gtts", output_path
 
     # Last resort
-    print(f"  WARNING: Using espeak (robotic)")
+    print(f"{tag}  WARNING: Using espeak (robotic)")
     if espeak_fallback(text, output_path):
-        return "espeak"
-    return "failed"
+        return name, "espeak", output_path
+    return name, "failed", output_path
 
 
 def combine_audio(segment_files, output_path):
@@ -247,15 +249,24 @@ if __name__ == "__main__":
         print(f"Translating to {VOICE_LANG}...")
         segments = [(name, translate_text(text, VOICE_LANG)) for name, text in segments]
 
-    segment_files = []
-    methods_used = []
-    for name, text in segments:
-        out = f"output/audio/segments/{name}.mp3"
-        print(f"\nSegment: {name}")
-        method = generate_segment(text, out, voice=VOICE_NAME,
-                                  lang=VOICE_LANG, hf_key=HF_API_KEY)
-        methods_used.append(method)
-        segment_files.append(out)
+    print(f"Generating {len(segments)} segments in parallel...\n")
+    results = {}
+    with ThreadPoolExecutor(max_workers=len(segments)) as executor:
+        futures = [
+            executor.submit(
+                generate_segment, name, text,
+                f"output/audio/segments/{name}.mp3",
+                voice=VOICE_NAME, lang=VOICE_LANG, hf_key=HF_API_KEY
+            )
+            for name, text in segments
+        ]
+        for future in as_completed(futures):
+            name, method, out = future.result()
+            results[name] = (method, out)
+
+    # Preserve original hook->fact1..5->outro order for combine_audio
+    segment_files = [results[name][1] for name, _ in segments]
+    methods_used = [results[name][0] for name, _ in segments]
 
     duration = combine_audio(segment_files, "output/audio/final_voiceover.mp3")
 
