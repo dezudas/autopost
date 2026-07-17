@@ -13,6 +13,8 @@ jobs:
   generate-video:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
