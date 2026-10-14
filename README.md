@@ -88,28 +88,20 @@ Configure these secrets in **Repository Settings → Secrets and variables → A
 4. Configure the **OAuth Consent Screen**:
    - User Type: **External**
    - App Name: `GuitarWithFacts`
-   - Test Users: Add your YouTube Google account email.
+   - **Important:** Click **"Publish App"** to set the publishing status to **"In production"**. (If left in "Testing" mode, Google will invalidate your refresh token every 7 days, causing `invalid_grant` errors!).
 5. Create Credentials:
    - Go to **APIs & Services → Credentials → Create Credentials → OAuth Client ID**.
    - Application Type: **Desktop App**.
    - Copy the generated **Client ID** and **Client Secret**.
 6. Generate Refresh Token:
-   - Open this URL in your browser (replace `YOUR_CLIENT_ID`):
-     ```
-     https://accounts.google.com/o/oauth2/v2/auth?client_id=YOUR_CLIENT_ID&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code&scope=https://www.googleapis.com/auth/youtube.upload+https://www.googleapis.com/auth/youtube&access_type=offline&prompt=consent
-     ```
-   - Authorize access and copy the authorization code.
-   - Exchange code for refresh token via terminal or curl:
+   - Run the included token generator helper script locally:
      ```bash
-     curl -X POST https://oauth2.googleapis.com/token \
-       -d "code=YOUR_AUTH_CODE" \
-       -d "client_id=YOUR_CLIENT_ID" \
-       -d "client_secret=YOUR_CLIENT_SECRET" \
-       -d "redirect_uri=urn:ietf:wg:oauth:2.0:oob" \
-       -d "grant_type=authorization_code"
+     python scripts/get_youtube_token.py
      ```
-   - Copy `"refresh_token"` from the JSON response.
-7. Save `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN` to GitHub Secrets.
+   - Enter your Client ID and Client Secret when prompted.
+   - It will open a browser window for you to log in and authorize.
+   - The script will output your `YOUTUBE_REFRESH_TOKEN`.
+7. Save `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and `YOUTUBE_REFRESH_TOKEN` to GitHub Secrets (**Settings → Secrets and variables → Actions**).
 
 ### 3. Optional: High-Quality Voice & Photos
 - **Hugging Face (`HF_API_KEY`):** Sign up free at [huggingface.co](https://huggingface.co/settings/tokens) and create an Access Token with read permissions. This enables Kokoro-82M neural voiceover.
@@ -128,6 +120,6 @@ Configure these secrets in **Repository Settings → Secrets and variables → A
 
 ## 🆘 Troubleshooting
 
-- **`invalid_grant` during upload:** Your refresh token has expired or was revoked. Re-run the OAuth authorization step and update `YOUTUBE_REFRESH_TOKEN`.
+- **`invalid_grant` during upload:** Your refresh token has expired or was revoked. This commonly happens if the Google Cloud OAuth Consent Screen is in "Testing" mode (which automatically expires tokens after 7 days) or after 6 months of inactivity. Set your Consent Screen to "In production", run `python scripts/get_youtube_token.py` to get a fresh token, and update `YOUTUBE_REFRESH_TOKEN` in GitHub Secrets.
 - **White subtitles / audio cut off:** Ensure you have the latest `scripts/4_assemble_video.py` which synchronizes segment silences and renders yellow high-contrast captions.
 - **Missing photos:** If `UNSPLASH_ACCESS_KEY` is not provided or rate limited, the pipeline automatically falls back to Pollinations AI and branded background cards.

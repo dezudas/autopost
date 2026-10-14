@@ -27,6 +27,10 @@ def get_access_token():
     if missing:
         raise ValueError(f"Missing required YouTube secrets: {', '.join(missing)}")
 
+    client_id = client_id.strip()
+    client_secret = client_secret.strip()
+    refresh_token = refresh_token.strip()
+
     r = requests.post("https://oauth2.googleapis.com/token", data={
         "client_id":     client_id,
         "client_secret": client_secret,
@@ -35,6 +39,17 @@ def get_access_token():
     }, timeout=30)
     data = r.json()
     if "access_token" not in data:
+        if data.get("error") == "invalid_grant":
+            raise Exception(
+                f"Token error: invalid_grant ({data}).\n"
+                "Your YOUTUBE_REFRESH_TOKEN is invalid, expired, or revoked.\n"
+                "Common causes:\n"
+                "1. In Google Cloud Console, your OAuth consent screen is set to 'Testing' status. "
+                "Tokens in Testing status expire after 7 days! Switch it to 'In production' (Publish App).\n"
+                "2. The token expired due to 6 months of inactivity or password change.\n"
+                "To fix: Run 'python scripts/get_youtube_token.py' locally to generate a fresh token, "
+                "then update the YOUTUBE_REFRESH_TOKEN secret in GitHub."
+            )
         raise Exception(f"Token error: {data}")
     print("Access token ready")
     return data["access_token"]

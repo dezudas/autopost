@@ -62,6 +62,7 @@ Required environment variables:
 
 ## Utility Scripts
 
+- `scripts/get_youtube_token.py` — local helper to generate/refresh `YOUTUBE_REFRESH_TOKEN` via browser OAuth
 - `scripts/2_generate_english_voice.py` — alternate voice generator (English-only variant)
 - `scripts/generate_voice_samples.py` — local test tool; generates sample audio for each Kokoro voice so you can pick one
 - `scripts/6_upload_tiktok.py` — TikTok upload (exists but commented out in the workflow; requires `TIKTOK_SESSION_ID` secret)
@@ -85,7 +86,7 @@ Required environment variables:
 
 ## Common Issues
 
-- **`invalid_grant` on YouTube upload** — refresh token expired; repeat the OAuth flow and update the secret
+- **`invalid_grant` on YouTube upload** — refresh token expired or revoked. Often caused by Google Cloud OAuth Consent Screen set to "Testing" (expires after 7 days); switch to "In production" and run `python scripts/get_youtube_token.py` to get a fresh token.
 - **Gradient images instead of guitar photos** — Unsplash key missing or rate-limited (50/hour), and Pollinations timed out; re-run the workflow or add `UNSPLASH_ACCESS_KEY`
 - **All topics completed** — add more lines to `list.txt`
 - **`GEMINI_API_KEY not set`** — secret missing or misnamed in GitHub repo settings
