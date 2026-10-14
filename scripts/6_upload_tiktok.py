@@ -18,10 +18,10 @@ def load_video_data():
         return json.load(f)
 
 
-def build_description(fruit_name, title, tags):
+def build_description(topic, title, tags):
     hashtags = [
         "GuitarWithFacts", "GuitarFacts",
-        fruit_name.replace(" ", ""),
+        topic.replace(" ", ""),
         "DidYouKnow", "LearnOnTikTok",
         "Guitar", "MusicTheory",
         "fyp", "foryoupage",
@@ -330,7 +330,7 @@ def main():
     print(f"Session ID: {session_id[:8]}...{session_id[-4:]}")
 
     data       = load_video_data()
-    fruit      = data["topic"]
+    topic      = data["topic"]
     title      = data["title"]
     tags       = data.get("tags", [])
     video_path = "output/final_video.mp4"
@@ -339,10 +339,10 @@ def main():
         print(f"ERROR: Video not found: {video_path}")
         sys.exit(1)
 
-    description = build_description(fruit, title, tags)
+    description = build_description(topic, title, tags)
 
     print(f"\n=== Uploading to TikTok ===")
-    print(f"Topic: {fruit}")
+    print(f"Topic: {topic}")
     print(f"Caption: {description[:100]}...\n")
 
     success = upload_to_tiktok(video_path, description, session_id)
@@ -357,5 +357,5 @@ def main():
         sys.exit(0)   # Don't fail the whole workflow
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()

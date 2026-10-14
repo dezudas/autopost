@@ -11,6 +11,15 @@ import random
 import requests
 
 
+def set_github_output(key, value):
+    if "GITHUB_OUTPUT" in os.environ:
+        try:
+            with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                f.write(f"{key}={value}\n")
+        except Exception as e:
+            print(f"Warning: Failed to write to GITHUB_OUTPUT: {e}")
+
+
 def get_next_topic():
     with open("list.txt", "r") as f:
         all_topics = [l.strip() for l in f if l.strip() and not l.startswith("#")]
@@ -21,8 +30,11 @@ def get_next_topic():
     remaining = [t for t in all_topics if t not in done]
     if not remaining:
         print("All topics completed!")
-        sys.exit(0)
+        set_github_output("has_topic", "false")
+        return None
     print(f"Next topic: {remaining[0]}")
+    set_github_output("has_topic", "true")
+    set_github_output("topic", remaining[0])
     return remaining[0]
 
 
@@ -67,14 +79,14 @@ Write REAL facts only. All fields must have actual content."""
 
 def call_gemini(prompt, api_key):
     """
-    Try lightest models first (less demand), heavy models last.
+    Try active, supported models: 2.0 Flash -> 2.0 Flash Lite -> 1.5 Flash -> 1.5 Pro.
     Smart backoff: 5s, 15s, 30s between retries.
     """
     models = [
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-flash-lite",
         "gemini-2.0-flash",
-        "gemini-2.5-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
     ]
 
     last_error = None
@@ -90,7 +102,8 @@ def call_gemini(prompt, api_key):
             "generationConfig": {
                 "temperature": 0.7,
                 "maxOutputTokens": 2000,
-                "topP": 0.9
+                "topP": 0.9,
+                "response_mime_type": "application/json"
             }
         }
 
@@ -153,10 +166,18 @@ def call_gemini(prompt, api_key):
 
 
 def parse_response(result):
-    raw = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+    candidates = result.get("candidates", [])
+    if not candidates:
+        raise ValueError(f"No candidates in Gemini response: {result}")
+    candidate = candidates[0]
+    parts = candidate.get("content", {}).get("parts", [])
+    if not parts:
+        finish_reason = candidate.get("finishReason", "UNKNOWN")
+        raise ValueError(f"No content parts returned (finishReason: {finish_reason})")
+    raw = parts[0].get("text", "").strip()
     if "```" in raw:
-        parts = raw.split("```")
-        for part in parts:
+        parts_split = raw.split("```")
+        for part in parts_split:
             cleaned = part.strip().lstrip("json").strip()
             if cleaned.startswith("{"):
                 raw = cleaned
@@ -190,5 +211,7 @@ def save_output(data):
 
 if __name__ == "__main__":
     topic = get_next_topic()
+    if topic is None:
+        sys.exit(0)
     data = generate_script(topic)
     save_output(data)

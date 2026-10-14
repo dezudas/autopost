@@ -230,30 +230,33 @@ def create_animated_clip(card_image_path, duration, output_path, anim_type="zoom
     if anim_type == "zoom_in":
         # Slowly zoom from 100% to 110% (cropping inward)
         crop_filter = (
-            f"scale={W}:-1,"
+            f"scale={W}:-2,"
             f"crop=w='iw*(1-0.0008*n)':h='ih*(1-0.0008*n)':"
             f"x='(iw-iw*(1-0.0008*n))/2':y='(ih-ih*(1-0.0008*n))/2',"
             f"scale={W}:{H}"
         )
     elif anim_type == "zoom_out":
         # Reverse zoom: 110% to 100%
+        w_zoom = (int(W * 1.12) // 2) * 2
         crop_filter = (
-            f"scale={int(W*1.12)}:-1,"
+            f"scale={w_zoom}:-2,"
             f"crop=w='iw*(0.89+0.0008*n)':h='ih*(0.89+0.0008*n)':"
             f"x='(iw-iw*(0.89+0.0008*n))/2':y='(ih-ih*(0.89+0.0008*n))/2',"
             f"scale={W}:{H}"
         )
     elif anim_type == "pan_right":
         # Pan from left to right, slight zoom
+        w_pan = (int(W * 1.15) // 2) * 2
         crop_filter = (
-            f"scale={int(W*1.15)}:-1,"
+            f"scale={w_pan}:-2,"
             f"crop=w='iw*0.87':h='ih*0.87':"
             f"x='(iw-iw*0.87)*(n/{total_frames})':y='(ih-ih*0.87)/2',"
             f"scale={W}:{H}"
         )
     elif anim_type == "pan_left":
+        w_pan = (int(W * 1.15) // 2) * 2
         crop_filter = (
-            f"scale={int(W*1.15)}:-1,"
+            f"scale={w_pan}:-2,"
             f"crop=w='iw*0.87':h='ih*0.87':"
             f"x='(iw-iw*0.87)*(1-n/{total_frames})':y='(ih-ih*0.87)/2',"
             f"scale={W}:{H}"
@@ -290,7 +293,7 @@ def create_animated_clip(card_image_path, duration, output_path, anim_type="zoom
 
 
 # ── Card creation functions (Canva "Fun Fact" reference) ─────────────────────
-def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
+def create_fact_card(topic, fact_num, total_facts, fact_text,
                      emoji, colors, bg_image_path, output_path):
     """Full-bleed photo with a soft dark overlay and a letterspaced FUN FACT
     label, per the Canva reference. Subtitles carry the fact text."""
@@ -321,7 +324,7 @@ def create_fact_card(fruit_name, fact_num, total_facts, fact_text,
     card.save(output_path, "PNG", optimize=False)
 
 
-def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output_path):
+def create_hook_card(topic, hook_text, emoji, colors, bg_image_path, output_path):
     """Peach FUN FACT speech-bubble card with lightbulb doodle, per the Canva reference."""
     card = blob_canvas(PEACH, PEACH_BLOB)
     draw = ImageDraw.Draw(card)
@@ -339,7 +342,7 @@ def create_hook_card(fruit_name, hook_text, emoji, colors, bg_image_path, output
     card.save(output_path, "PNG", optimize=False)
 
 
-def create_outro_card(fruit_name, emoji, colors, output_path):
+def create_outro_card(topic, emoji, colors, output_path):
     """Mint thought-bubble outro card, per the Canva reference."""
     card = blob_canvas(MINT, MINT_BLOB)
     draw = ImageDraw.Draw(card)
@@ -370,7 +373,7 @@ def create_subtitles(data, thumbnail_offset=1.5):
         "",  # No subtitle on outro card — outro has its own big stylish text
     ]
 
-    SILENCE = 0.4
+    SILENCE = 0.25  # Matches 0.25s silence in 2_generate_voice.py
     WPL = 4
     srt, idx = [], 1
     cursor = thumbnail_offset
@@ -406,23 +409,28 @@ def create_subtitles(data, thumbnail_offset=1.5):
 
 # ── Main video assembly with TWO-PASS approach (faster) ──────────────────────
 def assemble_video(data, srt_path, music_path):
-    fruit  = data["topic"]
-    emoji  = data.get("emoji", "🍎")
+    topic  = data["topic"]
+    emoji  = data.get("emoji", "🎸")
     colors = data.get("colors", {})
     vo     = data["voiceover"]
     out    = "output/final_video.mp4"
 
-    # Add 1.5s silence at start for thumbnail intro
+    SILENCE_GAP = 0.25  # Matches 2_generate_voice.py inter-segment silence
+    OUTRO_PAD   = 0.75  # Clean hold for outro card before video ends
+    THUMB_DURATION = 1.5  # Short thumbnail intro
+
+    # Add 1.5s silence at start for thumbnail intro and OUTRO_PAD at end
     voiceover_mp3_orig = "output/audio/final_voiceover.mp3"
     voiceover_mp3 = "output/audio/voiceover_with_intro.mp3"
-    THUMB_DURATION = 1.5  # short thumbnail intro
 
     subprocess.run([
         "ffmpeg", "-y",
         "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
         "-i", voiceover_mp3_orig,
         "-filter_complex",
-        f"[0:a]atrim=0:{THUMB_DURATION}[silence];[silence][1:a]concat=n=2:v=0:a=1[out]",
+        f"[0:a]atrim=0:{THUMB_DURATION}[intro];"
+        f"[0:a]atrim=0:{OUTRO_PAD}[pad];"
+        f"[intro][1:a][pad]concat=n=3:v=0:a=1[out]",
         "-map", "[out]",
         "-codec:a", "libmp3lame", "-qscale:a", "2",
         voiceover_mp3
@@ -441,7 +449,7 @@ def assemble_video(data, srt_path, music_path):
         p = f"output/audio/segments/{name}.mp3"
         seg_durs.append(get_duration(p) if os.path.exists(p) else 4.0)
 
-    # Get fruit images
+    # Get scene images
     scene_images = [f"output/images/scene_{i}.png" for i in range(1,6)
                     if os.path.exists(f"output/images/scene_{i}.png")]
     if not scene_images:
@@ -459,22 +467,22 @@ def assemble_video(data, srt_path, music_path):
         # STATIC (no animation) for first frame so YouTube picks crisp thumbnail
         cards_data.append(("output/thumbnail_vertical.png", THUMB_DURATION, "static"))
 
-    # Hook
-    create_hook_card(fruit, vo["hook"], emoji, colors, scene_images[0], "output/cards/hook.png")
-    cards_data.append(("output/cards/hook.png", seg_durs[0], "zoom_out"))
+    # Hook (segment duration + silence gap until fact 1 begins)
+    create_hook_card(topic, vo["hook"], emoji, colors, scene_images[0], "output/cards/hook.png")
+    cards_data.append(("output/cards/hook.png", seg_durs[0] + SILENCE_GAP, "zoom_out"))
 
-    # Facts with cycling animations
+    # Facts with cycling animations (segment duration + silence gap between facts)
     animations = ["pan_right", "zoom_in", "pan_left", "zoom_out", "zoom_in"]
     for i in range(5):
         text = vo[f"fact_{i+1}"]
         img_path = scene_images[i % len(scene_images)]
         card_path = f"output/cards/fact_{i+1}.png"
-        create_fact_card(fruit, i+1, 5, text, emoji, colors, img_path, card_path)
-        cards_data.append((card_path, seg_durs[i+1], animations[i]))
+        create_fact_card(topic, i+1, 5, text, emoji, colors, img_path, card_path)
+        cards_data.append((card_path, seg_durs[i+1] + SILENCE_GAP, animations[i]))
 
-    # Outro
-    create_outro_card(fruit, emoji, colors, "output/cards/outro.png")
-    cards_data.append(("output/cards/outro.png", seg_durs[6], "zoom_in"))
+    # Outro (outro voice duration + clean outro pad)
+    create_outro_card(topic, emoji, colors, "output/cards/outro.png")
+    cards_data.append(("output/cards/outro.png", seg_durs[6] + OUTRO_PAD, "zoom_in"))
 
     print(f"Cards ready: {len(cards_data)}")
 
@@ -528,15 +536,15 @@ def assemble_video(data, srt_path, music_path):
     srt_esc = srt_path.replace("\\", "/").replace(":", "\\:")
     fonts_dir = os.path.abspath("assets/fonts").replace("\\", "/").replace(":", "\\:")
     sub_style = (
-        "FontName=Inter 18pt,FontSize=17,Bold=0,"
-        "PrimaryColour=&H00FFFFFF,"        # white, per Canva caption style
-        "OutlineColour=&H60000000,"        # soft dark outline
-        "BackColour=&H80000000,"           # soft shadow
+        "FontName=Montserrat,FontSize=52,Bold=1,"
+        "PrimaryColour=&H0000FFFF,"        # Bright yellow (&HAABBGGRR)
+        "OutlineColour=&H00000000,"        # Solid black outline
+        "BackColour=&H80000000,"           # Soft shadow
         "BorderStyle=1,"
-        "Outline=1,Shadow=2,"
-        "Spacing=3,"                       # letterspaced captions
+        "Outline=3,Shadow=2,"
+        "Spacing=1,"
         "Alignment=2,"                     # Bottom center
-        "MarginV=140,"
+        "MarginV=280,"                     # Safe zone above Shorts/TikTok UI
         "MarginL=80,MarginR=80"
     )
 
@@ -556,7 +564,7 @@ def assemble_video(data, srt_path, music_path):
         "-i", voiceover_mp3,
         "-i", music_path,
         "-filter_complex",
-        f"[0:v]subtitles='{srt_esc}':fontsdir='{fonts_dir}':force_style='{sub_style}'[vout];"
+        f"[0:v]subtitles='{srt_esc}':fontsdir='{fonts_dir}':original_size=1080x1920:force_style='{sub_style}'[vout];"
         f"[1:a]{audio_filter}[clean_voice];"
         # Mix cleaned voice with subtle music (music at 12% volume)
         f"[clean_voice][2:a]amix=inputs=2:weights='1.0 0.12':"

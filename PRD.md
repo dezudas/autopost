@@ -208,9 +208,16 @@ git add done.txt && git commit -m "Auto: marked topic as done" && git push
 
 | # | File | Severity | Status | Description |
 |---|---|---|---|---|
-| 1 | `generate_video.yml` | Medium | ✅ Fixed | `HF_API_KEY` not passed to Step 2 → Kokoro TTS never used in CI |
-| 2 | `generate_video.yml` | Low | ✅ Fixed | `UNSPLASH_ACCESS_KEY` not passed to Step 3 → professional photos never fetched in CI |
-| 3 | `generate_video.yml` | Low | Open | Step 6 (TikTok) commented out in workflow — not run in CI |
+| 1 | `generate_video.yml` | Medium | ✅ Fixed | `HF_API_KEY` wired to Step 2 for Kokoro TTS |
+| 2 | `generate_video.yml` | Low | ✅ Fixed | `UNSPLASH_ACCESS_KEY` wired to Step 3 for professional photos |
+| 3 | `generate_video.yml` | Medium | ✅ Fixed | Topic exhaustion handling: downstream steps guarded by `has_topic` output |
+| 4 | `generate_video.yml` | Low | ✅ Fixed | Added fallback `github-actions[bot]` email for commit step |
+| 5 | `4_assemble_video.py` | High | ✅ Fixed | Audio/video desync & cut-off outro: aligned card clip durations with 0.25s audio silence gaps & added outro hold |
+| 6 | `4_assemble_video.py` | Medium | ✅ Fixed | Subtitle drift: aligned `SILENCE = 0.25` and resized font to 52px bold yellow with `original_size=1080x1920` |
+| 7 | `1_generate_script.py`| Medium | ✅ Fixed | Replaced non-existent Gemini models with active endpoints (`gemini-2.0-flash`, etc.) and enforced JSON schema mode |
+| 8 | `3_generate_images.py`| Medium | ✅ Fixed | Added broader query fallback on Unsplash when specific chord titles yield 0 photos |
+| 9 | `6_upload_tiktok.py`  | Low | ✅ Fixed | Uncommented script entry point and cleaned legacy naming |
+| 10| `README.md`           | Low | ✅ Fixed | Rewrote outdated "Fruits" documentation to align with "Guitar with Facts" |
 
 ---
 

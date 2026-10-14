@@ -111,9 +111,9 @@ def hex_to_rgb(hex_str, default=(255, 193, 7)):  # default: #FFC107 (design.md p
 
 
 # ── Search and download image from Unsplash ──────────────────────────────────
-def get_unsplash_image(query, output_path, access_key, orientation="portrait", index=0, tag=""):
+def get_unsplash_image(query, output_path, access_key, fallback_query=None, orientation="portrait", index=0, tag=""):
     """
-    Search Unsplash for high quality fruit photos.
+    Search Unsplash for high quality guitar photos.
     Downloads as 1080x1920 vertical (portrait) for Shorts.
     """
     headers = {
@@ -147,8 +147,18 @@ def get_unsplash_image(query, output_path, access_key, orientation="portrait", i
         return False
 
     results = r.json().get("results", [])
+    if not results and fallback_query and fallback_query != query:
+        print(f"{tag}  No results for '{query}' — trying broader search: '{fallback_query}'...")
+        params["query"] = fallback_query
+        try:
+            r_fallback = requests.get(search_url, headers=headers, params=params, timeout=15)
+            if r_fallback.status_code == 200:
+                results = r_fallback.json().get("results", [])
+        except Exception as e:
+            print(f"{tag}  Broader search failed: {e}")
+
     if not results:
-        print(f"{tag}  No results for '{query}' — trying broader search")
+        print(f"{tag}  No photos found for '{query}' or fallback")
         return False
 
     # Pick different image for each scene (cycle through results)
@@ -221,8 +231,8 @@ def create_fallback_image(output_path, index, width=1080, height=1920, tag=""):
 
 
 # ── Thumbnails (Canva "Fun Fact" bubble card style) ───────────────────────────
-def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
-                               bg_image_path, output_path):
+def create_vertical_thumbnail(topic_name, emoji, primary, accent, secondary,
+                              bg_image_path, output_path):
     """Peach speech-bubble card with lightbulb doodle, per the Canva reference."""
     W, H = 1080, 1920
     img = blob_canvas(W, H)
@@ -234,7 +244,7 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
               font=get_display_font(125), fill=ACCENT, anchor="mm")
 
     # Topic pill
-    topic_disp = fruit_name.upper()
+    topic_disp = topic_name.upper()
     if len(topic_disp) > 18:
         topic_disp = topic_disp[:17] + "…"
     py, ph = 930, 150
@@ -254,7 +264,7 @@ def create_vertical_thumbnail(fruit_name, emoji, primary, accent, secondary,
     print(f"Vertical thumbnail saved: {output_path}")
 
 
-def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
+def create_horizontal_thumbnail(topic_name, emoji, primary, accent, secondary,
                                 bg_image_path, output_path):
     """Peach card, landscape layout, per the Canva reference."""
     W, H = 1280, 720
@@ -272,7 +282,7 @@ def create_horizontal_thumbnail(fruit_name, emoji, primary, accent, secondary,
     # Right: channel + topic + teaser
     draw.text((540, 190), "GUITAR WITH FACTS",
               font=get_body_font(38), fill=CHARCOAL, anchor="lm")
-    topic_disp = fruit_name.upper()
+    topic_disp = topic_name.upper()
     topic_size = max(60, int(95 * min(1.0, 12 / max(len(topic_disp), 1))))
     draw.text((540, 320), topic_disp,
               font=get_display_font(topic_size), fill=ACCENT, anchor="lm")
@@ -299,13 +309,13 @@ if __name__ == "__main__":
 
     os.makedirs("output/images", exist_ok=True)
 
-    # Search queries — warm golden-hour mood, per the Canva reference
+    # Specific topic queries paired with reliable guitar photography fallbacks
     search_queries = [
-        f"{topic} guitar golden hour",
-        f"{topic} guitar warm sunlight",
-        f"acoustic guitar cozy soft light {topic}",
-        f"{topic} guitar sunset silhouette",
-        f"guitar warm morning light {topic}",
+        (f"{topic} guitar", "acoustic guitar close up"),
+        (f"guitar fretboard {topic}", "guitar fretboard hand position"),
+        (f"acoustic guitar {topic}", "acoustic guitar warm lighting"),
+        (f"electric guitar {topic}", "electric guitar neck close up"),
+        (f"guitarist playing {topic}", "guitarist playing on stage"),
     ]
 
     print(f"=== Generating images for: {topic} ===")
@@ -316,7 +326,8 @@ if __name__ == "__main__":
         print(f"UNSPLASH_ACCESS_KEY not set — using Pollinations fallback")
         print(f"Add UNSPLASH_ACCESS_KEY to GitHub Secrets for better images!")
 
-    def fetch_one(i, query):
+    def fetch_one(i, query_pair):
+        query, fallback_q = query_pair
         tag = f"[img {i+1}]"
         out = f"output/images/scene_{i+1}.png"
         success = False
@@ -324,7 +335,7 @@ if __name__ == "__main__":
 
         # Try Unsplash first
         if access_key:
-            result = get_unsplash_image(query, out, access_key, index=i, tag=tag)
+            result = get_unsplash_image(query, out, access_key, fallback_query=fallback_q, index=i, tag=tag)
             if result:
                 attribution = result
                 success = True
