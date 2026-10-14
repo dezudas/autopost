@@ -2,3 +2,4 @@
 C Major Chord
 G Major Chord
 D Major Chord
+A Minor Chord
