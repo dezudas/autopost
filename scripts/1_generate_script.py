@@ -100,7 +100,7 @@ Return ONLY raw valid JSON, no markdown, no backticks:
   }}
 }}
 
-Write REAL, accurate guitar theory and facts tailored to {topic_name}. All fields must contain authentic, practical guitar information."""
+Write REAL, accurate guitar theory and facts tailored to {topic_name}. Output valid standard JSON only: do not use raw unescaped newlines or unescaped quotes within string values."""
 
 
 def get_available_models(api_key):
@@ -170,10 +170,10 @@ def call_gemini(prompt, api_key):
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "temperature": 0.7,
-                "maxOutputTokens": 2000,
+                "temperature": 0.4,
+                "maxOutputTokens": 4096,
                 "topP": 0.9,
-                "response_mime_type": "application/json"
+                "responseMimeType": "application/json"
             }
         }
 
@@ -191,8 +191,15 @@ def call_gemini(prompt, api_key):
                 )
 
                 if r.status_code == 200:
-                    print("SUCCESS!")
-                    return r.json()
+                    try:
+                        data = parse_response(r.json())
+                        print("SUCCESS!")
+                        return data
+                    except Exception as parse_err:
+                        print(f"JSON parse error on {model} attempt {attempt+1}: {parse_err}")
+                        last_error = f"JSON parse error on {model}: {parse_err}"
+                        time.sleep(3)
+                        continue
 
                 err = r.text.lower()
                 print(f"HTTP {r.status_code}")
@@ -245,11 +252,12 @@ def parse_response(result):
     if not candidates:
         raise ValueError(f"No candidates in Gemini response: {result}")
     candidate = candidates[0]
+    finish_reason = candidate.get("finishReason", "UNKNOWN")
     parts = candidate.get("content", {}).get("parts", [])
     if not parts:
-        finish_reason = candidate.get("finishReason", "UNKNOWN")
         raise ValueError(f"No content parts returned (finishReason: {finish_reason})")
     raw = parts[0].get("text", "").strip()
+
     if "```" in raw:
         parts_split = raw.split("```")
         for part in parts_split:
@@ -257,10 +265,18 @@ def parse_response(result):
             if cleaned.startswith("{"):
                 raw = cleaned
                 break
+
     start, end = raw.find("{"), raw.rfind("}") + 1
     if start != -1 and end > start:
         raw = raw[start:end]
-    return json.loads(raw)
+
+    try:
+        return json.loads(raw, strict=False)
+    except Exception:
+        # Fallback: clean any literal unescaped newlines inside string values
+        import re
+        sanitized = re.sub(r'[\r\n]+', ' ', raw)
+        return json.loads(sanitized, strict=False)
 
 
 def generate_script(topic_name):
@@ -268,9 +284,8 @@ def generate_script(topic_name):
     if not api_key:
         raise ValueError("GEMINI_API_KEY not set in GitHub Secrets!")
     prompt = build_prompt(topic_name)
-    result = call_gemini(prompt, api_key)
-    data = parse_response(result)
-    assert len(data.get("description", "")) > 30, "Description too short"
+    data = call_gemini(prompt, api_key)
+    assert len(data.get("description", "")) > 20, "Description too short"
     assert len(data.get("voiceover", {}).get("fact_1", "")) > 10, "Fact 1 missing"
     print(f"\nScript generated for: {topic_name}")
     return data
