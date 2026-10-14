@@ -77,17 +77,61 @@ Return ONLY raw valid JSON, no markdown, no backticks:
 Write REAL facts only. All fields must have actual content."""
 
 
+def get_available_models(api_key):
+    """Query Google API for active generateContent models supported by this key."""
+    try:
+        url = "https://generativelanguage.googleapis.com/v1beta/models"
+        r = requests.get(
+            url,
+            headers={"x-goog-api-key": api_key},
+            params={"key": api_key},
+            timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json()
+            models = []
+            for item in data.get("models", []):
+                methods = item.get("supportedGenerationMethods", [])
+                if "generateContent" in methods:
+                    name = item.get("name", "").replace("models/", "")
+                    models.append(name)
+            if models:
+                # Prefer fast, lightweight Flash models first
+                priority = [
+                    "gemini-2.5-flash",
+                    "gemini-2.5-flash-lite",
+                    "gemini-2.0-flash",
+                    "gemini-2.0-flash-lite",
+                    "gemini-2.5-pro",
+                ]
+                sorted_models = [m for m in priority if m in models]
+                for m in models:
+                    if m not in sorted_models and "gemini" in m:
+                        sorted_models.append(m)
+                print(f"Discovered active models: {', '.join(sorted_models[:5])}")
+                return sorted_models
+        else:
+            print(f"Model discovery note: HTTP {r.status_code} ({r.text[:120]})")
+    except Exception as e:
+        print(f"Model discovery note: {e}")
+    return None
+
+
 def call_gemini(prompt, api_key):
     """
-    Try active, supported models: 2.0 Flash -> 2.0 Flash Lite -> 1.5 Flash -> 1.5 Pro.
+    Try active, supported models: 2.5 Flash -> 2.5 Flash Lite -> 2.0 Flash -> 2.5 Pro.
     Smart backoff: 5s, 15s, 30s between retries.
     """
-    models = [
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-    ]
+    api_key = api_key.strip()
+    models = get_available_models(api_key)
+    if not models:
+        models = [
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-pro",
+        ]
 
     last_error = None
     total_attempts = 0
@@ -113,7 +157,12 @@ def call_gemini(prompt, api_key):
             total_attempts += 1
             try:
                 print(f"  Attempt {attempt+1}/3...", end=" ", flush=True)
-                r = requests.post(url, json=payload, timeout=45)
+                r = requests.post(
+                    url,
+                    headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                    json=payload,
+                    timeout=45
+                )
 
                 if r.status_code == 200:
                     print("SUCCESS!")
@@ -122,12 +171,12 @@ def call_gemini(prompt, api_key):
                 err = r.text.lower()
                 print(f"HTTP {r.status_code}")
 
-                if r.status_code == 401:
-                    raise Exception("Invalid GEMINI_API_KEY — check GitHub Secret!")
+                if r.status_code == 401 or "api_key_invalid" in err:
+                    raise Exception(f"Invalid GEMINI_API_KEY — check GitHub Secret! Response: {r.text[:200]}")
 
                 if r.status_code == 404:
-                    print(f"  Model unavailable, trying next...")
-                    last_error = f"{model} not found"
+                    print(f"  Model unavailable ({r.text[:100]}), trying next...")
+                    last_error = f"{model} not found ({r.text[:80]})"
                     break
 
                 if r.status_code in [429, 503] or \
