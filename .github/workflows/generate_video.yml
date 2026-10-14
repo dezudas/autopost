@@ -48,10 +48,8 @@ jobs:
           HF_API_KEY: ${{ secrets.HF_API_KEY }}
         run: python scripts/2_generate_voice.py
 
-      - name: Step 3 - Generate Images (Unsplash + Pollinations fallback)
+      - name: Step 3 - Generate Modern Visual Assets & Thumbnails
         if: steps.step1.outputs.has_topic == 'true'
-        env:
-          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
         run: python scripts/3_generate_images.py
 
       - name: Step 4 - Assemble Interactive Shorts Video

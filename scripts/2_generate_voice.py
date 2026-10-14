@@ -237,11 +237,11 @@ if __name__ == "__main__":
 
     segments = [
         ("hook",   vo["hook"]),
-        ("fact_1", f"Fact 1! {vo['fact_1']}"),
-        ("fact_2", f"Fact 2! {vo['fact_2']}"),
-        ("fact_3", f"Fact 3! {vo['fact_3']}"),
-        ("fact_4", f"Fact 4! {vo['fact_4']}"),
-        ("fact_5", f"Fact 5! {vo['fact_5']}"),
+        ("fact_1", vo["fact_1"]),
+        ("fact_2", vo["fact_2"]),
+        ("fact_3", vo["fact_3"]),
+        ("fact_4", vo["fact_4"]),
+        ("fact_5", vo["fact_5"]),
         ("outro",  vo["outro"]),
     ]
 

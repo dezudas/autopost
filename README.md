@@ -12,13 +12,13 @@ Every Monday, Wednesday, and Friday at 9AM UTC (or via manual workflow dispatch)
 ```
 GitHub Actions (Ubuntu Runner)
        ↓
-[Step 1] Google Gemini AI     →  Writes structured JSON script (title, description, tags, facts)
+[Step 1] Google Gemini AI     →  Writes structured guitar lesson script (specs, facts, formula)
        ↓
 [Step 2] Hugging Face Kokoro  →  High-quality neural voiceover (fallback: gTTS → espeak-ng)
        ↓
-[Step 3] Unsplash API         →  Downloads 1080×1920 guitar photos (fallback: Pollinations AI)
+[Step 3] Pillow Local Cards   →  Generates modern dark-themed thumbnail assets (0.2s, 0 network calls)
        ↓
-[Step 4] FFmpeg (Two-Pass)    →  Pass 1: Clip animation (pan/zoom) → Pass 2: Audio mix & burnt-in yellow subtitles
+[Step 4] FFmpeg Two-Pass      →  Pass 1: Smooth text entry slide-up animation → Pass 2: Low-volume audio mix & subtitles
        ↓
 [Step 5] YouTube API          →  Uploads Short with category, hashtags, and thumbnail
        ↓

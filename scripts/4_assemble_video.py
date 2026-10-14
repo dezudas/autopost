@@ -1,7 +1,9 @@
 """
-Step 4: Assemble Shorts video with FAST animations
-Uses scale animations instead of slow zoompan filter
-~3x faster than zoompan, same cinematic feel
+Step 4: Modern, Elegant Shorts Video Assembler
+- Minimalist luxury dark aesthetic (Deep Slate & Amber Gold)
+- Smooth ease-out text slide-up & fade-in animation for each fact entry
+- Gentle low-volume background sound beneath crystal-clear voiceover
+- Zero external image dependencies (pure Python PIL + FFmpeg)
 """
 
 import json
@@ -16,23 +18,21 @@ from PIL import Image, ImageDraw, ImageFont
 W, H = 1080, 1920
 FPS = 24
 
-# ── Canva "Fun Fact" reference palette ────────────────────────────────────────
-PEACH      = (255, 224, 199)   # card background
-PEACH_BLOB = (255, 213, 177)   # organic blobs on peach
-MINT       = (162, 229, 211)   # outro background
-MINT_BLOB  = (145, 208, 192)
-ACCENT     = (207, 64, 26)     # orange-red heading/body
-CHARCOAL   = (60, 60, 80)
-PERIWINKLE = (126, 134, 210)
-WHITE      = (255, 255, 255)
+# ── Luxury Modern Dark Palette ──────────────────────────────────────────────
+BG_DARK      = (11, 15, 25)       # Deep slate midnight
+BG_CARD      = (21, 29, 42)       # Sleek charcoal surface
+BG_INNER_BOX = (15, 21, 32)       # Recessed callout box
+BORDER_COLOR = (40, 53, 72)       # Subtle hairline border
+BORDER_ACCENT= (65, 82, 108)      # Highlight border
+GOLD         = (245, 158, 11)     # Accent amber/gold
+WHITE        = (248, 250, 252)    # Crisp white
+MUTED        = (148, 163, 184)    # Secondary muted text
+CYAN         = (6, 182, 212)      # Accent cyan highlight
 
-
-# ── Font utilities (Montserrat display + Inter body, vendored in assets/fonts) ──
 FONTS_DIR = "assets/fonts"
 
 
 def get_display_font(size):
-    """Montserrat Black — bold sans-serif display font."""
     p = os.path.join(FONTS_DIR, "Montserrat-Black.ttf")
     if os.path.exists(p):
         return ImageFont.truetype(p, size)
@@ -41,49 +41,12 @@ def get_display_font(size):
 
 
 def get_body_font(size, bold=False):
-    """Inter Regular/Medium — clean sans-serif body font."""
-    p = os.path.join(FONTS_DIR, "Inter_18pt-Medium.ttf" if bold else "Inter_18pt-Regular.ttf")
+    f_name = "Inter_18pt-Medium.ttf" if bold else "Inter_18pt-Regular.ttf"
+    p = os.path.join(FONTS_DIR, f_name)
     if os.path.exists(p):
         return ImageFont.truetype(p, size)
     fb = f"/usr/share/fonts/truetype/dejavu/DejaVuSans{'-Bold' if bold else ''}.ttf"
     return ImageFont.truetype(fb, size) if os.path.exists(fb) else ImageFont.load_default()
-
-
-# ── Canva-style drawing helpers ───────────────────────────────────────────────
-def blob_canvas(bg, blob):
-    """Solid background with soft organic corner blobs, per the Canva reference."""
-    img = Image.new("RGB", (W, H), bg)
-    d = ImageDraw.Draw(img)
-    for box in [(-380, -260, 420, 330), (720, -200, 1420, 320),
-                (-300, 1430, 360, 2120), (800, 1480, 1480, 2080)]:
-        d.ellipse(box, fill=blob)
-    return img
-
-
-def draw_bubble(draw, x0, y0, x1, y1, radius=200, tail="speech"):
-    """Big white speech/thought bubble, per the Canva reference."""
-    draw.rounded_rectangle([(x0, y0), (x1, y1)], radius=radius, fill=WHITE)
-    if tail == "speech":
-        tx = x1 - 320
-        draw.polygon([(tx, y1 - 6), (tx + 150, y1 - 6), (tx + 125, y1 + 100)], fill=WHITE)
-    else:  # thought bubble
-        draw.ellipse([(x1 - 300, y1 - 20), (x1 - 215, y1 + 65)], fill=WHITE)
-        draw.ellipse([(x1 - 190, y1 + 85), (x1 - 135, y1 + 140)], fill=WHITE)
-
-
-def draw_bulb(draw, cx, cy, r=75, color=ACCENT):
-    """Hand-drawn lightbulb doodle, per the Canva reference."""
-    draw.ellipse([(cx - r, cy - r), (cx + r, cy + r)], outline=color, width=9)
-    draw.line([(cx - 34, cy + 22), (cx - 17, cy - 12), (cx, cy + 22),
-               (cx + 17, cy - 12), (cx + 34, cy + 22)],
-              fill=color, width=7, joint="curve")
-    draw.rounded_rectangle([(cx - 30, cy + r + 10), (cx + 30, cy + r + 50)],
-                           radius=12, fill=color)
-    for ang in range(-170, -9, 20):   # rays over the top half
-        a = math.radians(ang)
-        draw.line([(cx + (r + 20) * math.cos(a), cy + (r + 20) * math.sin(a)),
-                   (cx + (r + 48) * math.cos(a), cy + (r + 48) * math.sin(a))],
-                  fill=color, width=8)
 
 
 def wrap_text(draw, text, font, max_w):
@@ -93,7 +56,8 @@ def wrap_text(draw, text, font, max_w):
         if draw.textlength(t, font=font) <= max_w:
             cur = t
         else:
-            lines.append(cur)
+            if cur:
+                lines.append(cur)
             cur = w0
     if cur:
         lines.append(cur)
@@ -113,7 +77,7 @@ def get_duration(path):
     ], capture_output=True, text=True)
     try:
         return float(r.stdout.strip())
-    except:
+    except Exception:
         return 4.0
 
 
@@ -125,404 +89,379 @@ def to_srt(s):
     return f"{int(h):02d}:{int(m):02d}:{int(sec):02d},{ms:03d}"
 
 
+# ── Gentle Low-Volume Background Sound ───────────────────────────────────────
 def get_background_music(duration):
     """
-    Get soft royalty-free background music.
-    Strategy: Try multiple sources, fall back to a synthesized soft pad.
+    Generate warm, gentle acoustic ambient background music using FFmpeg synthesis.
+    Soft harmonic intervals, bandpass-filtered to leave speech clear.
     """
-    out = "output/audio/background_music.mp3"
-    trimmed = "output/audio/background_trimmed.mp3"
+    out = "output/audio/background_trimmed.mp3"
     os.makedirs("output/audio", exist_ok=True)
 
-    # Reliable royalty-free music sources
-    # These are CC0 (public domain) or royalty-free
-    music_urls = [
-        # Pixabay tracks (free for commercial use)
-        "https://cdn.pixabay.com/audio/2023/06/14/audio_a3c61dca31.mp3",
-        "https://cdn.pixabay.com/audio/2024/02/12/audio_ad2b71e6c4.mp3",
-        "https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3",
-    ]
-
-    for url in music_urls:
-        try:
-            print(f"Trying music: {url[-40:]}")
-            r = requests.get(url, timeout=20, headers={
-                "User-Agent": "Mozilla/5.0"
-            })
-            if r.status_code == 200 and len(r.content) > 50000:
-                with open(out, "wb") as f:
-                    f.write(r.content)
-
-                # Loop music if shorter than video duration, then trim to fit
-                fade_start = max(0, duration - 3)
-                result = subprocess.run([
-                    "ffmpeg", "-y",
-                    "-stream_loop", "-1",        # loop infinitely
-                    "-i", out,
-                    "-t", str(duration + 1),     # then trim to needed length
-                    "-af",
-                    f"volume=0.10,"
-                    f"highpass=f=200,"
-                    f"lowpass=f=8000,"
-                    f"afade=t=in:d=2,"
-                    f"afade=t=out:st={fade_start}:d=3",
-                    "-codec:a", "libmp3lame", "-qscale:a", "4",
-                    trimmed
-                ], capture_output=True, timeout=120)
-
-                if result.returncode == 0 and os.path.exists(trimmed) \
-                   and os.path.getsize(trimmed) > 5000:
-                    print(f"Music ready (downloaded): {trimmed}")
-                    return trimmed
-        except Exception as e:
-            print(f"  Failed: {e}")
-            continue
-
-    # Generate soft ambient pad music (guaranteed to work)
-    print("Using synthesized soft ambient music...")
-    return generate_soft_ambient(duration, trimmed)
-
-
-def generate_soft_ambient(duration, output_path):
-    """
-    Generate soft ambient pad music using FFmpeg synthesis.
-    Sounds like gentle background music, not beeping tones.
-    """
     fade_start = max(0, duration - 3)
-
-    # Layered sine waves at musical intervals (C, E, G - C major chord)
-    # With slow LFO modulation for organic feel
     cmd = [
         "ffmpeg", "-y",
-        # Three pad layers at musical frequencies
-        "-f", "lavfi", "-i", "sine=frequency=261.63:sample_rate=44100",  # C4
-        "-f", "lavfi", "-i", "sine=frequency=329.63:sample_rate=44100",  # E4
-        "-f", "lavfi", "-i", "sine=frequency=392.00:sample_rate=44100",  # G4
-        "-f", "lavfi", "-i", "sine=frequency=130.81:sample_rate=44100",  # C3 (bass)
+        "-f", "lavfi", "-i", "sine=frequency=220.00:sample_rate=44100",  # A3 (root)
+        "-f", "lavfi", "-i", "sine=frequency=261.63:sample_rate=44100",  # C4 (minor 3rd)
+        "-f", "lavfi", "-i", "sine=frequency=329.63:sample_rate=44100",  # E4 (5th)
+        "-f", "lavfi", "-i", "sine=frequency=110.00:sample_rate=44100",  # A2 (sub bass)
         "-filter_complex",
-        # Mix all 4 layers, apply tremolo for organic sound
-        f"[0][1][2][3]amix=inputs=4:duration=longest[mix];"
-        f"[mix]tremolo=f=0.5:d=0.3,"           # gentle tremolo
-        f"volume=0.06,"                         # very subtle
-        f"highpass=f=150,"                      # cleaner sound
-        f"lowpass=f=4000,"                      # warmer pad-like tone
-        f"afade=t=in:d=3,"
-        f"afade=t=out:st={fade_start}:d=3"
-        f"[out]",
+        "[0][1][2][3]amix=inputs=4:duration=longest[mix];"
+        "[mix]tremolo=f=0.4:d=0.25,"              # slow warm tremolo
+        "volume=0.05,"                            # gentle low volume
+        "highpass=f=180,"                         # avoid low boom
+        "lowpass=f=2500,"                         # warm soft tone (leaves voice clear)
+        f"afade=t=in:d=2,afade=t=out:st={fade_start}:d=3[out]",
         "-map", "[out]",
         "-t", str(duration + 1),
-        "-codec:a", "libmp3lame", output_path
+        "-codec:a", "libmp3lame",
+        out
     ]
-
     subprocess.run(cmd, capture_output=True, timeout=60)
-    print(f"Soft ambient music generated: {output_path}")
-    return output_path
+    print(f"Background ambient audio ready: {out}")
+    return out
 
 
-# ── Pre-render animation frames as a video clip (FAST — no zoompan) ──────────
-def create_animated_clip(card_image_path, duration, output_path, anim_type="zoom_in"):
+# ── Visual Canvas & Card Drawing ─────────────────────────────────────────────
+def create_base_background(topic, specs, output_path):
     """
-    Create animated video clip from a still image using simple scale+crop.
-    This is 3-5x FASTER than zoompan filter!
+    Creates the permanent modern background:
+    - Deep midnight slate with luxury frame
+    - Brand header at top: @GUITARWITHFACTS
+    - Topic title and quick specs banner
     """
-    total_frames = int(duration * FPS)
+    img = Image.new("RGB", (W, H), BG_DARK)
+    draw = ImageDraw.Draw(img)
 
-    if anim_type == "zoom_in":
-        # Slowly zoom from 100% to 110% (cropping inward)
-        crop_filter = (
-            f"scale={W}:-2,"
-            f"crop=w='iw*(1-0.0008*n)':h='ih*(1-0.0008*n)':"
-            f"x='(iw-iw*(1-0.0008*n))/2':y='(ih-ih*(1-0.0008*n))/2',"
-            f"scale={W}:{H}"
-        )
-    elif anim_type == "zoom_out":
-        # Reverse zoom: 110% to 100%
-        w_zoom = (int(W * 1.12) // 2) * 2
-        crop_filter = (
-            f"scale={w_zoom}:-2,"
-            f"crop=w='iw*(0.89+0.0008*n)':h='ih*(0.89+0.0008*n)':"
-            f"x='(iw-iw*(0.89+0.0008*n))/2':y='(ih-ih*(0.89+0.0008*n))/2',"
-            f"scale={W}:{H}"
-        )
-    elif anim_type == "pan_right":
-        # Pan from left to right, slight zoom
-        w_pan = (int(W * 1.15) // 2) * 2
-        crop_filter = (
-            f"scale={w_pan}:-2,"
-            f"crop=w='iw*0.87':h='ih*0.87':"
-            f"x='(iw-iw*0.87)*(n/{total_frames})':y='(ih-ih*0.87)/2',"
-            f"scale={W}:{H}"
-        )
-    elif anim_type == "pan_left":
-        w_pan = (int(W * 1.15) // 2) * 2
-        crop_filter = (
-            f"scale={w_pan}:-2,"
-            f"crop=w='iw*0.87':h='ih*0.87':"
-            f"x='(iw-iw*0.87)*(1-n/{total_frames})':y='(ih-ih*0.87)/2',"
-            f"scale={W}:{H}"
-        )
-    else:  # static (no animation)
-        crop_filter = f"scale={W}:{H}"
+    # Luxury outer frame inset
+    pad = 32
+    draw.rounded_rectangle([(pad, pad), (W - pad, H - pad)], radius=24, outline=BORDER_COLOR, width=2)
 
+    # Top brand bar
+    draw.text((W // 2, 130), "@GUITARWITHFACTS  •  60-SECOND BREAKDOWN",
+              font=get_body_font(26, bold=True), fill=GOLD, anchor="mm")
+
+    # Main Topic Title
+    f_title = get_display_font(74)
+    words = topic.upper().split()
+    if len(words) > 3:
+        t1 = " ".join(words[:2])
+        t2 = " ".join(words[2:])
+        draw.text((W // 2, 230), t1, font=f_title, fill=WHITE, anchor="mm")
+        draw.text((W // 2, 315), t2, font=f_title, fill=WHITE, anchor="mm")
+        specs_y = 405
+    else:
+        draw.text((W // 2, 250), topic.upper(), font=f_title, fill=WHITE, anchor="mm")
+        specs_y = 350
+
+    # Quick Specs Header Banner (Notes & Tab pill)
+    notes = specs.get("notes", "A • C • E")
+    tab = specs.get("tab", "X 0 2 2 1 0")
+    banner_text = f"NOTES: {notes}   |   TAB: {tab}"
+
+    bw, bh = 780, 56
+    bx0 = (W - bw) // 2
+    draw.rounded_rectangle([(bx0, specs_y - bh // 2), (bx0 + bw, specs_y + bh // 2)],
+                           radius=28, fill=BG_CARD, outline=BORDER_COLOR, width=1)
+    draw.text((W // 2, specs_y), banner_text, font=get_body_font(27, bold=True), fill=MUTED, anchor="mm")
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    img.save(output_path, "PNG")
+
+
+def create_fact_overlay(fact_idx, fact_data, total_facts, output_path):
+    """
+    Creates the transparent overlay card for each fact.
+    This is what animates in smoothly during video assembly!
+    """
+    card_w, card_h = 920, 780
+    img = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    # Main Card Body with rounded corners
+    draw.rounded_rectangle([(0, 0), (card_w, card_h)], radius=36, fill=(21, 29, 42, 255), outline=BORDER_ACCENT, width=2)
+
+    # Category Badge Pill at top of card
+    badge_text = fact_data.get("badge", f"FACT {fact_idx} OF {total_facts}").upper()
+    pill_w = int(draw.textlength(badge_text, font=get_body_font(26, bold=True)) + 44)
+    pill_h = 48
+    draw.rounded_rectangle([(48, 48), (48 + pill_w, 48 + pill_h)], radius=24, fill=(245, 158, 11, 255))
+    draw.text((48 + pill_w // 2, 48 + pill_h // 2), badge_text, font=get_body_font(24, bold=True), fill=(0, 0, 0), anchor="mm")
+
+    # Step progress indicator at right
+    step_indicator = f"{fact_idx:02d} / {total_facts:02d}"
+    draw.text((card_w - 48, 48 + pill_h // 2), step_indicator, font=get_body_font(26, bold=True), fill=MUTED, anchor="rm")
+
+    # Headline
+    headline = fact_data.get("headline", "Key Insight").strip()
+    f_head = get_display_font(50)
+    lines = wrap_text(draw, headline, f_head, card_w - 96)
+    head_y = 150
+    for i, ln in enumerate(lines[:2]):
+        draw.text((48, head_y + i * 62), ln, font=f_head, fill=WHITE)
+
+    # Informative Breakdown Box inside card
+    box_y0 = 310
+    box_y1 = card_h - 70
+    draw.rounded_rectangle([(48, box_y0), (card_w - 48, box_y1)], radius=24, fill=(15, 21, 32, 255), outline=BORDER_COLOR, width=2)
+
+    # Callout Box Header
+    box_title = fact_data.get("box_title", "CORE DETAIL").upper()
+    draw.text((80, box_y0 + 38), box_title, font=get_body_font(24, bold=True), fill=CYAN)
+
+    # Callout Box Content (e.g. Chord Notes, Tab position, or Pro Tip)
+    box_content = fact_data.get("box_content", "").strip()
+    if box_content:
+        f_box = get_body_font(34, bold=True)
+        content_lines = wrap_text(draw, box_content, f_box, card_w - 160)
+        for j, cln in enumerate(content_lines[:4]):
+            draw.text((80, box_y0 + 95 + j * 48), cln, font=f_box, fill=GOLD if j == 0 else WHITE)
+
+    # Subtle bottom branding dot
+    draw.text((card_w // 2, card_h - 32), "Swipe up for next fact • @guitarwithfacts",
+              font=get_body_font(20), fill=MUTED, anchor="mm")
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    img.save(output_path, "PNG")
+
+
+def create_hook_overlay(topic, hook_text, specs, output_path):
+    """Intro card overlay for the hook segment."""
+    card_w, card_h = 920, 780
+    img = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    draw.rounded_rectangle([(0, 0), (card_w, card_h)], radius=36, fill=(21, 29, 42, 255), outline=BORDER_ACCENT, width=2)
+
+    # Badge
+    draw.rounded_rectangle([(48, 48), (280, 96)], radius=24, fill=(245, 158, 11, 255))
+    draw.text((164, 72), "TODAY'S LESSON", font=get_body_font(24, bold=True), fill=(0, 0, 0), anchor="mm")
+
+    # Big Topic
+    draw.text((48, 160), topic.upper(), font=get_display_font(58), fill=WHITE)
+
+    # Hook message
+    f_body = get_body_font(36)
+    lines = wrap_text(draw, hook_text, f_body, card_w - 96)
+    for i, ln in enumerate(lines[:4]):
+        draw.text((48, 250 + i * 50), ln, font=f_body, fill=MUTED)
+
+    # Specs box at bottom
+    box_y0 = 500
+    draw.rounded_rectangle([(48, box_y0), (card_w - 48, card_h - 50)], radius=24, fill=(15, 21, 32, 255), outline=BORDER_COLOR, width=2)
+    notes = specs.get("notes", "A • C • E")
+    formula = specs.get("formula", "Root • Flat 3rd • 5th")
+    draw.text((80, box_y0 + 40), f"FORMULA:  {formula}", font=get_body_font(28, bold=True), fill=CYAN)
+    draw.text((80, box_y0 + 95), f"NOTES:    {notes}", font=get_body_font(32, bold=True), fill=GOLD)
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    img.save(output_path, "PNG")
+
+
+def create_outro_overlay(topic, output_path):
+    """Outro card overlay."""
+    card_w, card_h = 920, 780
+    img = Image.new("RGBA", (card_w, card_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    draw.rounded_rectangle([(0, 0), (card_w, card_h)], radius=36, fill=(21, 29, 42, 255), outline=BORDER_ACCENT, width=2)
+
+    # Badge
+    draw.rounded_rectangle([(48, 48), (300, 96)], radius=24, fill=(245, 158, 11, 255))
+    draw.text((174, 72), "LESSON COMPLETE", font=get_body_font(24, bold=True), fill=(0, 0, 0), anchor="mm")
+
+    # Title
+    draw.text((48, 170), "PRACTICE THIS DAILY", font=get_display_font(52), fill=WHITE)
+
+    # CTA Box
+    box_y0 = 270
+    draw.rounded_rectangle([(48, box_y0), (card_w - 48, card_h - 70)], radius=24, fill=(15, 21, 32, 255), outline=BORDER_COLOR, width=2)
+    draw.text((card_w // 2, box_y0 + 80), "LIKE & SUBSCRIBE", font=get_display_font(48), fill=GOLD, anchor="mm")
+    draw.text((card_w // 2, box_y0 + 150), "For daily guitar chords, theory & tips", font=get_body_font(30), fill=MUTED, anchor="mm")
+    draw.text((card_w // 2, box_y0 + 230), "Save this Short for your guitar practice!", font=get_body_font(30, bold=True), fill=CYAN, anchor="mm")
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    img.save(output_path, "PNG")
+
+
+# ── Simple Text Animation: Smooth Entry Slide-Up & Fade-In ───────────────────
+def create_animated_fact_clip(bg_path, overlay_path, duration, output_path, target_y=510):
+    """
+    Renders an animated clip using FFmpeg:
+    - Card smoothly slides up by 80px and fades in during first 0.45s (quarter-sine ease-out)
+    - Stays completely locked and crisp for the remainder of the fact duration
+    """
     cmd = [
         "ffmpeg", "-y",
-        "-loop", "1",
-        "-t", str(duration),
-        "-i", card_image_path,
-        "-vf", f"{crop_filter},setsar=1,fps={FPS}",
+        "-loop", "1", "-t", str(duration), "-i", bg_path,
+        "-loop", "1", "-t", str(duration), "-i", overlay_path,
+        "-filter_complex",
+        f"[0:v][1:v]overlay=x='(W-w)/2':y='if(lt(t, 0.45), {target_y} + 80*(1 - sin(t/0.45*PI/2)), {target_y})':alpha='min(1, t/0.3)'[v]",
+        "-map", "[v]",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "23",
         "-pix_fmt", "yuv420p",
+        "-r", str(FPS),
         "-an",
         output_path
     ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-    if result.returncode != 0:
-        # Fallback: just static image to video
-        print(f"  Animation failed, using static: {result.stderr[-200:]}")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if res.returncode != 0:
+        print(f"Animation failed, falling back to static overlay: {res.stderr[-200:]}")
+        # Fallback static overlay
         subprocess.run([
-            "ffmpeg", "-y", "-loop", "1", "-t", str(duration),
-            "-i", card_image_path,
-            "-vf", f"scale={W}:{H},setsar=1,fps={FPS}",
+            "ffmpeg", "-y",
+            "-loop", "1", "-t", str(duration), "-i", bg_path,
+            "-loop", "1", "-t", str(duration), "-i", overlay_path,
+            "-filter_complex", f"[0:v][1:v]overlay=x='(W-w)/2':y={target_y}[v]",
+            "-map", "[v]",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-            "-pix_fmt", "yuv420p", "-an",
+            "-pix_fmt", "yuv420p", "-r", str(FPS), "-an",
             output_path
-        ], capture_output=True, timeout=120)
+        ], capture_output=True, timeout=60)
 
 
-# ── Card creation functions (Canva "Fun Fact" reference) ─────────────────────
-def create_fact_card(topic, fact_num, total_facts, fact_text,
-                     emoji, colors, bg_image_path, output_path):
-    """Full-bleed photo with a soft dark overlay and a letterspaced FUN FACT
-    label, per the Canva reference. Subtitles carry the fact text."""
-    try:
-        bg = Image.open(bg_image_path).resize((W, H), Image.LANCZOS).convert("RGB")
-    except Exception:
-        bg = Image.new("RGB", (W, H), CHARCOAL)
-
-    # Darker toward the bottom so captions stay readable — built with a single
-    # stretched gradient + LUT instead of 500 per-row draw calls.
-    ov = Image.new("RGBA", (W, H), (0, 0, 0, 70))
-    band_h = 500
-    grad = Image.linear_gradient("L").resize((W, band_h))
-    lut = [70 + v * 110 // 255 for v in range(256)]
-    alpha_band = grad.point(lut)
-    r, g, b, a = ov.split()
-    a.paste(alpha_band, (0, H - band_h))
-    ov = Image.merge("RGBA", (r, g, b, a))
-    card = Image.alpha_composite(bg.convert("RGBA"), ov).convert("RGB")
-    draw = ImageDraw.Draw(card)
-
-    label = " ".join(f"FUN FACT {fact_num} OF {total_facts}")
-    draw.text((W // 2 + 3, 173), label, font=get_body_font(38), fill=(0, 0, 0), anchor="mm")
-    draw.text((W // 2, 170), label, font=get_body_font(38), fill=WHITE, anchor="mm")
-    draw.text((W // 2, 245), "@guitarwithfacts",
-              font=get_body_font(30), fill=(235, 235, 235), anchor="mm")
-
-    card.save(output_path, "PNG", optimize=False)
+def create_static_intro_clip(image_path, duration, output_path):
+    """Static 1.5s clip for thumbnail so YouTube captures a sharp cover."""
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-loop", "1", "-t", str(duration),
+        "-i", image_path,
+        "-vf", f"scale={W}:{H},setsar=1,fps={FPS}",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-pix_fmt", "yuv420p", "-an",
+        output_path
+    ], capture_output=True, timeout=60)
 
 
-def create_hook_card(topic, hook_text, emoji, colors, bg_image_path, output_path):
-    """Peach FUN FACT speech-bubble card with lightbulb doodle, per the Canva reference."""
-    card = blob_canvas(PEACH, PEACH_BLOB)
-    draw = ImageDraw.Draw(card)
-
-    draw_bubble(draw, 70, 420, W - 70, 1480, tail="speech")
-    draw_bulb(draw, W // 2, 620)
-    draw.text((W // 2, 850), "FUN FACT", font=get_display_font(125), fill=ACCENT, anchor="mm")
-
-    f_body = get_body_font(52)
-    for i, ln in enumerate(wrap_text(draw, hook_text, f_body, 720)[:6]):
-        draw.text((W // 2, 990 + i * 78), ln, font=f_body, fill=ACCENT, anchor="mm")
-
-    draw.text((W // 2, H - 60), "Guitar with Facts",
-              font=get_body_font(36), fill=ACCENT, anchor="mm")
-    card.save(output_path, "PNG", optimize=False)
-
-
-def create_outro_card(topic, emoji, colors, output_path):
-    """Mint thought-bubble outro card, per the Canva reference."""
-    card = blob_canvas(MINT, MINT_BLOB)
-    draw = ImageDraw.Draw(card)
-
-    draw_bubble(draw, 90, 500, W - 90, 1420, tail="thought")
-    draw.text((W // 2, 710), "THANKS FOR", font=get_display_font(95), fill=CHARCOAL, anchor="mm")
-    draw.text((W // 2, 855), "WATCHING!", font=get_display_font(140), fill=ACCENT, anchor="mm")
-
-    f_body = get_body_font(50)
-    for i, ln in enumerate(["Like & Subscribe", "for more guitar facts!"]):
-        draw.text((W // 2, 1060 + i * 80), ln, font=f_body, fill=PERIWINKLE, anchor="mm")
-
-    draw.text((W // 2, H - 60), "Guitar with Facts",
-              font=get_body_font(36), fill=CHARCOAL, anchor="mm")
-    card.save(output_path, "PNG", optimize=False)
-
-
+# ── Subtitles ─────────────────────────────────────────────────────────────────
 def create_subtitles(data, thumbnail_offset=1.5):
     vo = data["voiceover"]
-    seg_names = ["hook","fact_1","fact_2","fact_3","fact_4","fact_5","outro"]
+    seg_names = ["hook", "fact_1", "fact_2", "fact_3", "fact_4", "fact_5", "outro"]
     seg_texts = [
         vo["hook"],
-        f"Fact 1! {vo['fact_1']}",
-        f"Fact 2! {vo['fact_2']}",
-        f"Fact 3! {vo['fact_3']}",
-        f"Fact 4! {vo['fact_4']}",
-        f"Fact 5! {vo['fact_5']}",
-        "",  # No subtitle on outro card — outro has its own big stylish text
+        vo["fact_1"],
+        vo["fact_2"],
+        vo["fact_3"],
+        vo["fact_4"],
+        vo["fact_5"],
+        "",  # No subtitles on outro card — outro has its own big stylish CTA
     ]
 
-    SILENCE = 0.25  # Matches 0.25s silence in 2_generate_voice.py
+    SILENCE = 0.25
     WPL = 4
     srt, idx = [], 1
     cursor = thumbnail_offset
 
-    for name, text in zip(seg_names, seg_texts):
-        seg_path = f"output/audio/segments/{name}.mp3"
-        dur = get_duration(seg_path) if os.path.exists(seg_path) \
-              else max(2.0, len(text.split()) / 3.0 if text else 3.0)
-
-        # Skip subtitle generation for empty text (outro card)
-        if not text.strip():
-            cursor += dur + SILENCE
-            continue
-
-        words = text.split()
-        chunks = [words[i:i+WPL] for i in range(0, len(words), WPL)]
-        card_d = dur / max(len(chunks), 1)
-        for chunk in chunks:
-            srt.append(
-                f"{idx}\n{to_srt(cursor)} --> {to_srt(cursor + card_d - 0.05)}\n"
-                f"{' '.join(chunk)}\n"
-            )
-            idx += 1
-            cursor += card_d
-        cursor += SILENCE
-
-    srt_path = os.path.abspath("output/subtitles.srt")
-    with open(srt_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(srt))
-    print(f"Subtitles: {idx-1} cards")
-    return srt_path, cursor
-
-
-# ── Main video assembly with TWO-PASS approach (faster) ──────────────────────
-def assemble_video(data, srt_path, music_path):
-    topic  = data["topic"]
-    emoji  = data.get("emoji", "🎸")
-    colors = data.get("colors", {})
-    vo     = data["voiceover"]
-    out    = "output/final_video.mp4"
-
-    SILENCE_GAP = 0.25  # Matches 2_generate_voice.py inter-segment silence
-    OUTRO_PAD   = 0.75  # Clean hold for outro card before video ends
-    THUMB_DURATION = 1.5  # Short thumbnail intro
-
-    # Add 1.5s silence at start for thumbnail intro and OUTRO_PAD at end
-    voiceover_mp3_orig = "output/audio/final_voiceover.mp3"
-    voiceover_mp3 = "output/audio/voiceover_with_intro.mp3"
-
-    subprocess.run([
-        "ffmpeg", "-y",
-        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
-        "-i", voiceover_mp3_orig,
-        "-filter_complex",
-        f"[0:a]atrim=0:{THUMB_DURATION}[intro];"
-        f"[0:a]atrim=0:{OUTRO_PAD}[pad];"
-        f"[intro][1:a][pad]concat=n=3:v=0:a=1[out]",
-        "-map", "[out]",
-        "-codec:a", "libmp3lame", "-qscale:a", "2",
-        voiceover_mp3
-    ], capture_output=True, timeout=60)
-
-    if not os.path.exists(voiceover_mp3) or os.path.getsize(voiceover_mp3) < 1000:
-        voiceover_mp3 = voiceover_mp3_orig
-
-    total_dur = get_duration(voiceover_mp3)
-    print(f"Duration: {total_dur:.1f}s")
-
-    # Get audio segment durations
-    seg_names = ["hook","fact_1","fact_2","fact_3","fact_4","fact_5","outro"]
-    seg_durs = []
-    for name in seg_names:
+    for i, name in enumerate(seg_names):
         p = f"output/audio/segments/{name}.mp3"
-        seg_durs.append(get_duration(p) if os.path.exists(p) else 4.0)
+        dur = get_duration(p) if os.path.exists(p) else 4.0
+        text = seg_texts[i]
 
-    # Get scene images
-    scene_images = [f"output/images/scene_{i}.png" for i in range(1,6)
-                    if os.path.exists(f"output/images/scene_{i}.png")]
-    if not scene_images:
-        scene_images = ["output/images/scene_1.png"]
+        if text.strip():
+            words = text.split()
+            chunk_cnt = math.ceil(len(words) / WPL)
+            chunk_dur = (dur - 0.1) / max(1, chunk_cnt)
+            for c in range(chunk_cnt):
+                cwords = words[c * WPL: (c + 1) * WPL]
+                cstart = cursor + c * chunk_dur
+                cend = cursor + (c + 1) * chunk_dur
+                srt.append(f"{idx}\n{to_srt(cstart)} --> {to_srt(cend)}\n{' '.join(cwords)}\n")
+                idx += 1
+        cursor += dur + SILENCE
 
-    # Create cards
-    print("Creating cards...")
+    os.makedirs("output", exist_ok=True)
+    out_path = "output/subtitles.srt"
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(srt))
+    print(f"Subtitles generated: {len(srt)} chunks")
+    return out_path, cursor
+
+
+# ── Assembly Pipeline ────────────────────────────────────────────────────────
+def assemble_video(data, srt_path, music_path):
+    out = "output/final_video.mp4"
+    topic = data.get("topic", "Guitar Lesson")
+    specs = data.get("specs", {})
+    facts_list = data.get("facts", [])
+    vo = data["voiceover"]
+
+    # Segment durations
+    seg_names = ["hook", "fact_1", "fact_2", "fact_3", "fact_4", "fact_5", "outro"]
+    seg_durs = [get_duration(f"output/audio/segments/{n}.mp3") for n in seg_names]
+
     os.makedirs("output/cards", exist_ok=True)
     os.makedirs("output/clips", exist_ok=True)
 
-    cards_data = []  # (card_path, duration, anim_type)
+    # 1. Generate Base Canvas Background
+    base_bg_path = "output/cards/base_bg.png"
+    create_base_background(topic, specs, base_bg_path)
+
+    # 2. Generate Overlay Cards
+    hook_overlay = "output/cards/hook_overlay.png"
+    create_hook_overlay(topic, vo["hook"], specs, hook_overlay)
+
+    fact_overlays = []
+    for i in range(5):
+        fact_data = facts_list[i] if i < len(facts_list) else {
+            "badge": f"0{i+1} / INSIGHT",
+            "headline": f"Fact {i+1}",
+            "box_title": "DETAILS",
+            "box_content": vo[f"fact_{i+1}"]
+        }
+        ov_path = f"output/cards/fact_{i+1}_overlay.png"
+        create_fact_overlay(i + 1, fact_data, 5, ov_path)
+        fact_overlays.append(ov_path)
+
+    outro_overlay = "output/cards/outro_overlay.png"
+    create_outro_overlay(topic, outro_overlay)
+
+    # 3. Build Clip Queue
+    SILENCE_GAP = 0.25
+    OUTRO_PAD = 2.0
+    THUMB_DURATION = 1.5
+
+    clips_plan = []  # (type, bg, overlay, duration, output_clip_path)
 
     # Thumbnail intro
     if os.path.exists("output/thumbnail_vertical.png"):
-        # STATIC (no animation) for first frame so YouTube picks crisp thumbnail
-        cards_data.append(("output/thumbnail_vertical.png", THUMB_DURATION, "static"))
+        clips_plan.append(("static", "output/thumbnail_vertical.png", None, THUMB_DURATION, "output/clips/clip_0.mp4"))
 
-    # Hook (segment duration + silence gap until fact 1 begins)
-    create_hook_card(topic, vo["hook"], emoji, colors, scene_images[0], "output/cards/hook.png")
-    cards_data.append(("output/cards/hook.png", seg_durs[0] + SILENCE_GAP, "zoom_out"))
+    # Hook
+    clips_plan.append(("anim", base_bg_path, hook_overlay, seg_durs[0] + SILENCE_GAP, "output/clips/clip_1.mp4"))
 
-    # Facts with cycling animations (segment duration + silence gap between facts)
-    animations = ["pan_right", "zoom_in", "pan_left", "zoom_out", "zoom_in"]
+    # Facts 1 to 5
     for i in range(5):
-        text = vo[f"fact_{i+1}"]
-        img_path = scene_images[i % len(scene_images)]
-        card_path = f"output/cards/fact_{i+1}.png"
-        create_fact_card(topic, i+1, 5, text, emoji, colors, img_path, card_path)
-        cards_data.append((card_path, seg_durs[i+1] + SILENCE_GAP, animations[i]))
+        clips_plan.append(("anim", base_bg_path, fact_overlays[i], seg_durs[i+1] + SILENCE_GAP, f"output/clips/clip_{i+2}.mp4"))
 
-    # Outro (outro voice duration + clean outro pad)
-    create_outro_card(topic, emoji, colors, "output/cards/outro.png")
-    cards_data.append(("output/cards/outro.png", seg_durs[6] + OUTRO_PAD, "zoom_in"))
+    # Outro
+    clips_plan.append(("anim", base_bg_path, outro_overlay, seg_durs[6] + OUTRO_PAD, "output/clips/clip_7.mp4"))
 
-    print(f"Cards ready: {len(cards_data)}")
+    print(f"\n=== Pass 1: Rendering Animated Clips ({len(clips_plan)} segments) ===")
 
-    # ── PASS 1: Render each card as animated clip (independent ffmpeg calls) ──
-    print("\n=== Pass 1: Animating each clip (parallel) ===")
+    def render_clip(item):
+        ctype, bg, overlay, dur, clip_out = item
+        if ctype == "static":
+            create_static_intro_clip(bg, dur, clip_out)
+        else:
+            create_animated_fact_clip(bg, overlay, dur, clip_out)
+        return clip_out if os.path.exists(clip_out) else None
 
-    def render_one(i, card, dur, anim):
-        clip_path = f"output/clips/clip_{i}.mp4"
-        print(f"  [clip {i+1}/{len(cards_data)}] {anim}, {dur:.1f}s...")
-        create_animated_clip(card, dur, clip_path, anim)
-        return i, clip_path if os.path.exists(clip_path) else None
+    with ThreadPoolExecutor(max_workers=min(4, len(clips_plan))) as executor:
+        results = list(executor.map(render_clip, clips_plan))
 
-    rendered = {}
-    with ThreadPoolExecutor(max_workers=min(4, len(cards_data))) as executor:
-        futures = [
-            executor.submit(render_one, i, card, dur, anim)
-            for i, (card, dur, anim) in enumerate(cards_data)
-        ]
-        for future in as_completed(futures):
-            i, clip_path = future.result()
-            rendered[i] = clip_path
-            if clip_path is None:
-                print(f"  WARNING: clip {i} failed")
-
-    # Preserve original card order (thumbnail->hook->facts->outro) for the concat file
-    clip_paths = [rendered[i] for i in range(len(cards_data)) if rendered[i]]
-
+    clip_paths = [c for c in results if c]
     if not clip_paths:
-        raise RuntimeError("No clips were created!")
+        raise RuntimeError("Failed to create video clips")
 
-    # ── PASS 2: Concat all clips + add audio + subtitles ──────────────────────
-    print("\n=== Pass 2: Combining clips + audio + subtitles ===")
-
-    # Create concat list
+    # 4. Concatenate All Clips
+    print("\n=== Pass 2: Concat + Low-Volume Background Music + Subtitles ===")
     concat_file = "output/clips/concat.txt"
     with open(concat_file, "w") as f:
-        for clip in clip_paths:
-            f.write(f"file '{os.path.abspath(clip)}'\n")
+        for c in clip_paths:
+            f.write(f"file '{os.path.abspath(c)}'\n")
 
-    # First concat all video clips (no re-encode = super fast)
     concat_video = "output/clips/concat_video.mp4"
     subprocess.run([
         "ffmpeg", "-y",
@@ -532,48 +471,43 @@ def assemble_video(data, srt_path, music_path):
         concat_video
     ], capture_output=True, timeout=120)
 
-    # Then add audio + subtitles in single pass
+    # 5. Final Pass: Merge Subtitles + Audio Mix with Low-Volume Sound
     srt_esc = srt_path.replace("\\", "/").replace(":", "\\:")
-    fonts_dir = os.path.abspath("assets/fonts").replace("\\", "/").replace(":", "\\:")
+    fonts_dir = os.path.abspath(FONTS_DIR).replace("\\", "/").replace(":", "\\:")
+
+    # Clean, modern yellow subtitles with subtle rounded black backing box
     sub_style = (
-        "FontName=Montserrat,FontSize=52,Bold=1,"
-        "PrimaryColour=&H0000FFFF,"        # Bright yellow (&HAABBGGRR)
-        "OutlineColour=&H00000000,"        # Solid black outline
-        "BackColour=&H80000000,"           # Soft shadow
-        "BorderStyle=1,"
-        "Outline=3,Shadow=2,"
-        "Spacing=1,"
+        "FontName=Montserrat,FontSize=50,Bold=1,"
+        "PrimaryColour=&H0000FFFF,"        # High-contrast bright yellow
+        "OutlineColour=&H00000000,"        # Black outline
+        "BackColour=&HA0000000,"           # Semi-transparent dark pill background
+        "BorderStyle=3,"                   # Opaque box / backing
+        "Outline=2,Shadow=0,"
         "Alignment=2,"                     # Bottom center
-        "MarginV=280,"                     # Safe zone above Shorts/TikTok UI
-        "MarginL=80,MarginR=80"
+        "MarginV=250,"                     # Safe zone above Shorts UI
+        "MarginL=60,MarginR=60"
     )
 
-    # ── MINIMAL audio processing — gTTS is already clean ──────────────────
-    # Over-processing causes "air blowing" noise and pumping artifacts
-    # Just normalize loudness and gently clean very low rumble
     audio_filter = (
-        # Light high-pass at 80Hz (cuts only true rumble, doesn't affect voice)
         "highpass=f=80,"
-        # Loudness normalization to YouTube broadcast standard
         "loudnorm=I=-16:TP=-1.5:LRA=11"
     )
 
     cmd = [
         "ffmpeg", "-y",
         "-i", concat_video,
-        "-i", voiceover_mp3,
+        "-i", "output/audio/final_voiceover.mp3",
         "-i", music_path,
         "-filter_complex",
         f"[0:v]subtitles='{srt_esc}':fontsdir='{fonts_dir}':original_size=1080x1920:force_style='{sub_style}'[vout];"
         f"[1:a]{audio_filter}[clean_voice];"
-        # Mix cleaned voice with subtle music (music at 12% volume)
-        f"[clean_voice][2:a]amix=inputs=2:weights='1.0 0.12':"
-        f"duration=longest:dropout_transition=0[aout]",
+        # Mix voice with subtle background sound at 6% volume (weights: 1.0 vs 0.06)
+        f"[clean_voice][2:a]amix=inputs=2:weights='1.0 0.06':duration=longest:dropout_transition=2[aout]",
         "-map", "[vout]",
         "-map", "[aout]",
         "-c:v", "libx264",
         "-preset", "ultrafast",
-        "-crf", "24",
+        "-crf", "23",
         "-c:a", "aac",
         "-b:a", "192k",
         "-ar", "44100",
@@ -584,30 +518,24 @@ def assemble_video(data, srt_path, music_path):
         out
     ]
 
-    print("Final encoding...")
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-
-    if result.returncode == 0:
+    print("Running final encode...")
+    res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if res.returncode == 0:
         size = os.path.getsize(out) / 1024 / 1024
         dur = get_duration(out)
-        print(f"\nVideo ready: {out} ({size:.1f}MB, {dur:.1f}s)")
+        print(f"\nSUCCESS! Modern Shorts Video ready: {out} ({size:.1f}MB, {dur:.1f}s)")
     else:
-        print("FFmpeg error:")
-        print(result.stderr[-3000:])
+        print("FFmpeg assembly error:")
+        print(res.stderr[-2000:])
         raise RuntimeError("Final assembly failed")
 
 
 if __name__ == "__main__":
     data = load_video_data()
-    print(f"=== Assembling: {data['topic']} ===")
-
+    print(f"=== Assembling Modern Short: {data['topic']} ===")
     srt_path, _ = create_subtitles(data, thumbnail_offset=1.5)
-    # Music must cover the FULL video duration
-    # Voiceover + 3s thumbnail intro + 5s safety buffer for outro
-    voiceover_raw_dur = get_duration("output/audio/final_voiceover.mp3")
-    total_video_dur = voiceover_raw_dur + 1.5 + 5.0  # +intro +outro
-    print(f"Voiceover: {voiceover_raw_dur:.1f}s, Total video: {total_video_dur:.1f}s")
-    music_path = get_background_music(total_video_dur)
+    vo_dur = get_duration("output/audio/final_voiceover.mp3")
+    total_dur = vo_dur + 1.5 + 4.0
+    music_path = get_background_music(total_dur)
     assemble_video(data, srt_path, music_path)
-
-    print("\nDone!")
+    print("\nAssembly complete!")

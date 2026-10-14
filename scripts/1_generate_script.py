@@ -39,42 +39,68 @@ def get_next_topic():
 
 
 def build_prompt(topic_name):
-    return f"""You are a YouTube Shorts script writer for "Guitar with Facts" channel.
+    return f"""You are an elite guitar instructor and creator for the "Guitar with Facts" channel.
 
-Create a punchy 60-second script about: {topic_name}
+Create an engaging, modern, elegant, and highly educational 60-second YouTube Shorts script about: {topic_name}
+Tone: Modern, sleek, authoritative, engaging (like Vox or MasterClass for musicians).
 
 Return ONLY raw valid JSON, no markdown, no backticks:
 
 {{
   "topic": "{topic_name}",
-  "title": "5 Wild Facts About {topic_name} #Shorts #GuitarFacts",
-  "description": "Write 80-100 words about {topic_name} facts with hashtags at end",
-  "tags": ["{topic_name}", "guitar facts", "shorts", "did you know", "guitar chords", "music theory", "guitar tips", "guitar with facts", "5 facts", "educational shorts"],
-  "voiceover": {{
-    "hook": "One punchy hook sentence about {topic_name} max 12 words",
-    "fact_1": "One surprising fact about {topic_name} max 20 words",
-    "fact_2": "One technique or playing tip about {topic_name} max 20 words",
-    "fact_3": "One history or origin fact about {topic_name} max 20 words",
-    "fact_4": "One famous player or song using {topic_name} max 20 words",
-    "fact_5": "One record or unique use of {topic_name} max 20 words",
-    "outro": "Follow for more guitar facts! Like and subscribe to Guitar with Facts!"
+  "title": "Master {topic_name} in 60 Seconds #GuitarTips #Shorts",
+  "description": "Essential breakdown of {topic_name}: chord notes, fret tab, fingering tips, and iconic songs. Follow Guitar with Facts for daily guitar tips!",
+  "tags": ["{topic_name}", "guitar lesson", "guitar tutorial", "guitar chords", "music theory", "guitar tips", "guitar with facts", "shorts", "learn guitar"],
+  "specs": {{
+    "notes": "A • C • E",
+    "tab": "X 0 2 2 1 0",
+    "formula": "Root • Flat 3rd • 5th",
+    "difficulty": "Beginner / Intermediate"
   }},
-  "image_prompts": [
-    "Professional photo of guitarist demonstrating {topic_name} on white background",
-    "Close-up macro of guitar fretboard showing {topic_name} hand position",
-    "Acoustic guitar with {topic_name} chord shape, warm studio lighting",
-    "Electric guitar neck showing {topic_name} with dark dramatic background",
-    "Guitarist playing {topic_name} on stage with concert lighting"
+  "facts": [
+    {{
+      "badge": "01 / CHORD FORMULA",
+      "headline": "The Triad Anatomy",
+      "box_title": "NOTES & INTERVALS",
+      "box_content": "A (Root) • C (♭3) • E (5th)"
+    }},
+    {{
+      "badge": "02 / FRET TAB & FINGERS",
+      "headline": "Exact Hand Positioning",
+      "box_title": "TAB & FINGERING",
+      "box_content": "Tab: X 0 2 2 1 0 | Fingers: 2, 3, 1"
+    }},
+    {{
+      "badge": "03 / GOLDEN PRO TIP",
+      "headline": "Keep High E Ringing",
+      "box_title": "CRITICAL TECHNIQUE",
+      "box_content": "Arch index finger to prevent muting string 1"
+    }},
+    {{
+      "badge": "04 / ICONIC SONGS",
+      "headline": "Legendary Guitar Hits",
+      "box_title": "HEARD IN TRACKS",
+      "box_content": "Stairway to Heaven • House of the Rising Sun"
+    }},
+    {{
+      "badge": "05 / SECRET VARIATION",
+      "headline": "Instant Lush Am7 Voicing",
+      "box_title": "PRO COLOR CHORD",
+      "box_content": "Lift ring finger for an open, airy Am7"
+    }}
   ],
-  "colors": {{
-    "primary": "vibrant hex color matching guitar or music theme",
-    "secondary": "complementary darker hex color",
-    "accent": "bright accent hex color"
-  }},
-  "emoji": "best emoji for {topic_name}"
+  "voiceover": {{
+    "hook": "Here is everything you need to master {topic_name} in 60 seconds.",
+    "fact_1": "Explain the notes, formula, and the distinctive musical vibe of {topic_name} (max 20 words).",
+    "fact_2": "Give exact string-by-string fingering and fret positions clearly (max 20 words).",
+    "fact_3": "Reveal the #1 physical technique mistake beginners make and how to fix it (max 20 words).",
+    "fact_4": "Name famous songs or legendary guitarists who made this chord iconic (max 20 words).",
+    "fact_5": "Share an advanced variation, movable shape, or secret voicing (max 20 words).",
+    "outro": "Save this Short for your guitar practice, and subscribe to Guitar with Facts for daily tips!"
+  }}
 }}
 
-Write REAL facts only. All fields must have actual content."""
+Write REAL, accurate guitar theory and facts tailored to {topic_name}. All fields must contain authentic, practical guitar information."""
 
 
 def get_available_models(api_key):
