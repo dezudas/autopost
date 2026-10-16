@@ -5,3 +5,4 @@ D Major Chord
 A Minor Chord
 E Minor Chord
 F Major Chord
+B Minor Chord
